@@ -152,7 +152,10 @@ for component in components:
         if not candidates:
             st.info("No candidates were researched for this ingredient.")
         for candidate in candidates:
-            with st.expander(f"{candidate['name']} ({candidate['match_type']})", expanded=True):
+            suppliers_label = ", ".join(candidate.get("candidate_suppliers", [])) or "—"
+            pid = candidate.get("product_id", "?")
+            header = f"{suppliers_label} — {candidate['name']} [ID: {pid}] ({candidate['match_type']})"
+            with st.expander(header, expanded=True):
                 st.markdown(f"**Inference:** {candidate.get('inference', '-')}")
 
                 if candidate.get("facts"):

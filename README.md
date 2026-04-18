@@ -1,5 +1,13 @@
 # Agnes Sourcing Workspace
 
+<p align="center">
+  <img src="docs/img/product_research.gif" alt="UI" />
+</p>
+
+<p align="center">
+  <img src="docs/img/graph.png" alt="Graph" />
+</p>
+
 Agnes is now a lightweight sourcing decision workspace demo built on top of the provided SQLite portfolio graph.
 
 What is real in this repo:
@@ -86,3 +94,5 @@ pytest -q
 - pricing, savings, and lead-time logic
 - universal compliance engine
 - broader CPG generalization beyond the narrow supplement demo slice
+
+

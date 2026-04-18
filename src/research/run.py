@@ -106,6 +106,8 @@ def run_research(db_path=None, product=None, component=None):
                 candidates_researched.append({
                     "name": candidate_name,
                     "match_type": candidate["match_type"],
+                    "product_id": candidate.get("product_id"),
+                    "candidate_suppliers": [s["supplier_name"] for s in candidate.get("candidate_suppliers", [])],
                     "facts": [],
                     "rules": [],
                     "inference": f"Research failed: {candidate_err}",
@@ -120,6 +122,8 @@ def run_research(db_path=None, product=None, component=None):
             candidates_researched.append({
                 "name": candidate_name,
                 "match_type": candidate["match_type"],
+                "product_id": candidate.get("product_id"),
+                "candidate_suppliers": [s["supplier_name"] for s in candidate.get("candidate_suppliers", [])],
                 "facts": verdict["facts"],
                 "rules": verdict["rules"],
                 "inference": verdict["inference"],
