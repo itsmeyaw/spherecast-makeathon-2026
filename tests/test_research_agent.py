@@ -67,6 +67,50 @@ def test_research_substitution_excluded_tools_when_no_brave_key():
     assert "web_search" not in tool_names
 
 
+def test_research_substitution_with_structured_response():
+    from src.compliance.research_agent import SubstitutionVerdict, EvidenceRow
+
+    verdict = SubstitutionVerdict(
+        facts=["Ascorbic acid is vitamin C"],
+        rules=["FDA allows name variants"],
+        inference="Chemically identical.",
+        caveats=["No dosage data"],
+        evidence_rows=[
+            EvidenceRow(
+                source_type="pgvector",
+                source_label="Doc search",
+                source_uri="s3://docs/product.json",
+                fact_type="product_context",
+                fact_value="Contains vitamin C",
+                quality_score=0.9,
+                snippet="Vitamin C (as Ascorbic Acid) 1000mg",
+            )
+        ],
+    )
+    mock_agent = MagicMock()
+    mock_agent.stream.return_value = iter([
+        {"model": {"messages": [AIMessage(content="tool call")], "structured_response": verdict}},
+    ])
+
+    with patch("src.compliance.research_agent.create_deep_agent", return_value=mock_agent):
+        with patch("src.compliance.research_agent.ChatBedrockConverse"):
+            from src.compliance.research_agent import research_substitution
+
+            result = research_substitution(
+                original={
+                    "original_ingredient": "vitamin-c",
+                    "group": {"canonical_name": "vitamin-c", "function": "antioxidant"},
+                    "requirements": [],
+                },
+                substitute={"current_match_name": "ascorbic-acid", "match_type": "alias"},
+                product_sku="FG-iherb-10421",
+                company_name="NOW Foods",
+            )
+
+    assert result["inference"] == "Chemically identical."
+    assert result["evidence_rows"][0]["source_type"] == "pgvector"
+
+
 def test_build_tools_includes_search_tds():
     with patch("src.compliance.research_agent.create_deep_agent"):
         with patch("src.compliance.research_agent.ChatBedrockConverse"):

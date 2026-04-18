@@ -14,12 +14,12 @@ from src.substitute.find_candidates import find_candidates_for_component
 logger = logging.getLogger(__name__)
 
 
-def _extract_and_persist_specs(db_path, evidence_rows, component_product_id):
+def extract_and_persist_specs(db_path, evidence_rows, component_product_id):
     for row in evidence_rows:
         if not row.get("fact_type", "").startswith("spec:"):
             continue
         source_label = row.get("source_label", "")
-        supplier_name_match = re.match(r"^(.+?)\s+TDS\s+for\s+", source_label)
+        supplier_name_match = re.match(r"^(.+?)\s+TDS\b", source_label)
         if not supplier_name_match:
             logger.warning("Cannot parse supplier name from source_label: %s", source_label)
             continue
@@ -94,12 +94,25 @@ def run_research(db_path=None, product=None, component=None):
                 "current_match_name": candidate_name,
                 "match_type": candidate["match_type"],
             }
-            verdict = research_substitution(
-                original=original_info,
-                substitute=sub_info,
-                product_sku=product["sku"],
-                company_name=product["company_name"],
-            )
+            try:
+                verdict = research_substitution(
+                    original=original_info,
+                    substitute=sub_info,
+                    product_sku=product["sku"],
+                    company_name=product["company_name"],
+                )
+            except Exception as candidate_err:
+                logger.exception("Job %d: candidate %s failed", job_id, candidate_name)
+                candidates_researched.append({
+                    "name": candidate_name,
+                    "match_type": candidate["match_type"],
+                    "facts": [],
+                    "rules": [],
+                    "inference": f"Research failed: {candidate_err}",
+                    "caveats": ["This candidate could not be fully researched due to an error."],
+                    "evidence_rows": [],
+                })
+                continue
             logger.info(
                 "Job %d: candidate %s returned %d facts, %d rules",
                 job_id, candidate_name, len(verdict["facts"]), len(verdict["rules"]),
@@ -113,7 +126,7 @@ def run_research(db_path=None, product=None, component=None):
                 "caveats": verdict["caveats"],
                 "evidence_rows": verdict["evidence_rows"],
             })
-            _extract_and_persist_specs(
+            extract_and_persist_specs(
                 db_path=db_path,
                 evidence_rows=verdict["evidence_rows"],
                 component_product_id=component["product_id"],

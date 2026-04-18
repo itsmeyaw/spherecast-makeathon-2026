@@ -12,6 +12,7 @@ from src.common.db import (
 )
 from src.compliance.research_agent import research_substitution_stream
 from src.opportunity.store import ensure_workspace_ready
+from src.research.run import extract_and_persist_specs
 from src.substitute.find_candidates import find_candidates_for_component
 
 GREEN = "\033[92m"
@@ -47,12 +48,19 @@ def find_component_by_ingredient(product, ingredient_name):
     return None
 
 
-def print_verdict(candidate_name, result):
+def print_verdict(candidate, result):
     verdict = result.get("verdict", result.get("blocker_state", "unknown"))
     color = VERDICT_COLORS.get(verdict, GRAY)
-    print(f"\n{BOLD}Candidate: {candidate_name}{RESET}")
-    print(f"  Verdict: {color}{verdict.upper()}{RESET}")
-    print(f"  Confidence: {result.get('confidence', 'unknown')}")
+    candidate_suppliers = candidate.get("candidate_suppliers", [])
+    supplier_names = ", ".join(s["supplier_name"] for s in candidate_suppliers) if candidate_suppliers else "none"
+    print(f"\n{BOLD}Candidate: {candidate['current_match_name']}{RESET}")
+    print(f"  Manufacturer:  {candidate.get('company_name', 'unknown')}")
+    print(f"  SKU:           {candidate.get('sku', 'unknown')}")
+    print(f"  Match type:    {candidate.get('match_type', 'unknown')}")
+    print(f"  Canonical:     {candidate.get('canonical_name', 'unknown')}")
+    print(f"  Suppliers:     {supplier_names}")
+    print(f"  Verdict:       {color}{verdict.upper()}{RESET}")
+    print(f"  Confidence:    {result.get('confidence', 'unknown')}")
 
     if result.get("facts"):
         print(f"  {BOLD}Facts:{RESET}")
@@ -107,11 +115,17 @@ def main():
         )
         sys.exit(1)
 
-    print(f"{BOLD}Product:{RESET} {product['company_name']} — {product['sku']}")
-    print(f"{BOLD}Original ingredient:{RESET} {args.original}")
-
     candidates_data = find_candidates_for_component(component=component, finished_product=product)
     all_candidates = candidates_data["exact_candidates"] + candidates_data["alias_candidates"]
+    suppliers = candidates_data.get("current_suppliers", [])
+    supplier_names = ", ".join(s["supplier_name"] for s in suppliers) if suppliers else "none"
+
+    print(f"{BOLD}Product:{RESET}      {product['company_name']} — {product['sku']}")
+    print(f"{BOLD}Ingredient:{RESET}   {args.original} (SKU: {component['sku']})")
+    print(f"{BOLD}Manufacturer:{RESET} {component.get('component_company_name', 'unknown')}")
+    print(f"{BOLD}BOM ID:{RESET}       {component.get('bom_id', 'unknown')}")
+    print(f"{BOLD}Canonical:{RESET}    {', '.join(candidates_data['canonical_names'])}")
+    print(f"{BOLD}Suppliers:{RESET}    {supplier_names}")
 
     if not all_candidates:
         print(f"\n{GRAY}No substitution candidates found for {args.original}.{RESET}")
@@ -156,7 +170,12 @@ def main():
                     result = data
 
             if result:
-                print_verdict(candidate["current_match_name"], result)
+                print_verdict(candidate, result)
+                extract_and_persist_specs(
+                    db_path=None,
+                    evidence_rows=result.get("evidence_rows", []),
+                    component_product_id=component["product_id"],
+                )
             else:
                 print(f"\n{RED}No result for {candidate['current_match_name']}{RESET}")
         except Exception as e:

@@ -58,25 +58,12 @@ When reporting evidence_rows for TDS/spec findings, use:
 - fact_value: the extracted value with unit (e.g., "99.5%", "< 0.5 ppm")
 - source_label: include supplier name and product SKU (e.g., "ADM TDS for RM-vitamin-c-123")
 
-When you have completed your research, respond with ONLY a JSON object (no \
-markdown fences, no preamble) matching this exact schema:
-{
-  "facts": ["string", ...],
-  "rules": ["string", ...],
-  "inference": "string",
-  "caveats": ["string", ...],
-  "evidence_rows": [
-    {
-      "source_type": "pgvector|sqlite|web-search|pubchem|fda-api",
-      "source_label": "string",
-      "source_uri": "string",
-      "fact_type": "string",
-      "fact_value": "string",
-      "quality_score": 0.0-1.0,
-      "snippet": "string"
-    }
-  ]
-}
+Your final response will be automatically parsed into a structured format. \
+Populate every field: facts (list of factual findings), rules (applicable \
+regulations), inference (your overall compliance verdict), caveats (uncertainties \
+or limitations), and evidence_rows (source citations with quality scores 0-1). \
+For evidence_rows use source_type values like: pgvector, sqlite, web-search, \
+pubchem, fda-api, or tds.
 """
 
 
@@ -116,16 +103,23 @@ def _build_agent():
         config=BotoConfig(read_timeout=1000, connect_timeout=10, retries={"max_attempts": 3, "mode": "adaptive"}),
     )
 
-    max_rounds = int(os.environ.get("RESEARCH_MAX_ROUNDS", "20"))
+    max_rounds = int(os.environ.get("RESEARCH_MAX_ROUNDS", "12"))
 
     return create_deep_agent(
         model=llm,
         tools=_build_tools(),
         system_prompt=RESEARCH_SYSTEM_PROMPT,
+        response_format=SubstitutionVerdict,
     ), max_rounds
 
 
-def _parse_verdict(text: str) -> SubstitutionVerdict:
+def _parse_verdict(raw) -> SubstitutionVerdict:
+    if isinstance(raw, list):
+        raw = " ".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in raw
+        )
+    text = str(raw)
     start = text.find("{")
     end = text.rfind("}") + 1
     if start == -1 or end == 0:
@@ -198,29 +192,45 @@ def research_substitution_stream(original, substitute, product_sku, company_name
     user_message = _make_user_message(original, substitute, product_sku, company_name)
 
     last_model_messages = None
-    for chunk in agent.stream(
-        {"messages": [{"role": "user", "content": user_message}]},
-        config={"recursion_limit": max_rounds * 2},
-        stream_mode="updates",
-    ):
-        if "model" in chunk and "messages" in chunk["model"]:
-            msgs = chunk["model"]["messages"]
-            last_model_messages = msgs
-            for tc in _extract_tool_calls(msgs):
-                yield ("tool_call", tc)
-            for text in _extract_text(msgs):
-                yield ("thinking", text)
+    verdict = None
+    chunk_keys_seen = set()
+    try:
+        for chunk in agent.stream(
+            {"messages": [{"role": "user", "content": user_message}]},
+            config={"recursion_limit": max_rounds * 5},
+            stream_mode="updates",
+        ):
+            chunk_keys_seen.update(chunk.keys())
 
-        if "tools" in chunk and "messages" in chunk["tools"]:
-            for tr in _extract_tool_results(chunk["tools"]["messages"]):
-                yield ("tool_result", tr)
+            if "model" in chunk and "messages" in chunk["model"]:
+                msgs = chunk["model"]["messages"]
+                last_model_messages = msgs
+                for tc in _extract_tool_calls(msgs):
+                    yield ("tool_call", tc)
+                for text in _extract_text(msgs):
+                    yield ("thinking", text)
 
-    if not last_model_messages:
-        raise RuntimeError(f"Agent produced no model output for {original['original_ingredient']} → {sub_name}")
+                sr = chunk["model"].get("structured_response")
+                if sr is not None:
+                    verdict = sr if isinstance(sr, SubstitutionVerdict) else SubstitutionVerdict.model_validate(sr)
 
-    final_msg = last_model_messages[-1]
-    final_text = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
-    verdict = _parse_verdict(final_text)
+            if "tools" in chunk and "messages" in chunk["tools"]:
+                for tr in _extract_tool_results(chunk["tools"]["messages"]):
+                    yield ("tool_result", tr)
+    except Exception:
+        logger.exception("Stream error during research: %s → %s (chunks seen: %s)", original["original_ingredient"], sub_name, chunk_keys_seen)
+        if verdict is None and last_model_messages:
+            logger.info("Attempting to parse verdict from last model messages before stream error")
+        else:
+            raise
+
+    if verdict is None and last_model_messages:
+        final_msg = last_model_messages[-1]
+        final_content = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
+        verdict = _parse_verdict(final_content)
+
+    if verdict is None:
+        raise RuntimeError(f"Agent produced no output for {original['original_ingredient']} → {sub_name} (chunk keys seen: {chunk_keys_seen})")
 
     logger.info(
         "Research complete: %s → %s — %d facts, %d rules, %d evidence rows",

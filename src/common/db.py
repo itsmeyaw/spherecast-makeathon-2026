@@ -1,7 +1,7 @@
 import json
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 DB_PATH = "db.sqlite"
 
@@ -615,6 +615,21 @@ def update_research_job(db_path=None, job_id=None, status=None, result_json=None
         WHERE Id = ?
         """,
         (status, result_json, error_message, now_iso(), job_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def expire_stale_running_jobs(db_path=None, stale_minutes=30):
+    conn = get_connection(db_path)
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=stale_minutes)).isoformat()
+    conn.execute(
+        """
+        UPDATE Research_Job
+        SET Status = 'failed', ErrorMessage = 'Job timed out (stuck in running state)', UpdatedAt = ?
+        WHERE Status IN ('pending', 'running') AND UpdatedAt < ?
+        """,
+        (now_iso(), cutoff),
     )
     conn.commit()
     conn.close()

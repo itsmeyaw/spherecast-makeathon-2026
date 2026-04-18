@@ -4,6 +4,7 @@ import threading
 import streamlit as st
 
 from src.common.db import (
+    expire_stale_running_jobs,
     get_bom_components,
     get_finished_goods,
     get_latest_research_job,
@@ -18,6 +19,8 @@ from src.substitute.find_candidates import find_candidates_for_component
 st.set_page_config(page_title="Product Research", layout="wide")
 st.title("Product Research")
 st.caption("Select a product to view its ingredients and trigger agentic substitution research.")
+
+expire_stale_running_jobs()
 
 finished_goods = get_finished_goods()
 if not finished_goods:
