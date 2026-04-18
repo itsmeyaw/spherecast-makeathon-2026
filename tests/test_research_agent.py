@@ -24,7 +24,7 @@ def test_research_substitution_returns_verdict_shape():
     })
     mock_agent = MagicMock()
     mock_agent.stream.return_value = iter([
-        {"messages": [AIMessage(content=verdict_json)]},
+        {"model": {"messages": [AIMessage(content=verdict_json)]}},
     ])
 
     with patch("src.compliance.research_agent.create_deep_agent", return_value=mock_agent):

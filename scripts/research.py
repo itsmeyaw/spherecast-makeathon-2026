@@ -8,10 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.common.db import (
     get_bom_components,
     get_finished_goods,
-    get_suppliers_for_product,
     parse_ingredient_name,
 )
-from src.compliance.research_agent import research_substitution
+from src.compliance.research_agent import research_substitution_stream
 from src.opportunity.store import ensure_workspace_ready
 from src.substitute.find_candidates import find_candidates_for_component
 
@@ -89,7 +88,7 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
     else:
         logging.basicConfig(level=logging.WARNING)
 
@@ -138,13 +137,28 @@ def main():
         }
 
         try:
-            result = research_substitution(
+            result = None
+            for event_type, data in research_substitution_stream(
                 original=original_info,
                 substitute=sub_info,
                 product_sku=product["sku"],
                 company_name=product["company_name"],
-            )
-            print_verdict(candidate["current_match_name"], result)
+            ):
+                if event_type == "tool_call":
+                    print(f"  {GRAY}🔧 {data['name']}({', '.join(f'{k}={v!r}' for k, v in list(data['args'].items())[:2])}){RESET}", flush=True)
+                elif event_type == "tool_result":
+                    snippet = data["snippet"][:80].replace("\n", " ")
+                    print(f"  {GRAY}   ← {data['name']}: {snippet}...{RESET}", flush=True)
+                elif event_type == "thinking":
+                    preview = data[:120].replace("\n", " ")
+                    print(f"  {GRAY}💭 {preview}{RESET}", flush=True)
+                elif event_type == "result":
+                    result = data
+
+            if result:
+                print_verdict(candidate["current_match_name"], result)
+            else:
+                print(f"\n{RED}No result for {candidate['current_match_name']}{RESET}")
         except Exception as e:
             print(f"\n{RED}Error researching {candidate['current_match_name']}: {e}{RESET}")
 

@@ -111,17 +111,9 @@ def _parse_verdict(text: str) -> SubstitutionVerdict:
     return SubstitutionVerdict.model_validate(json.loads(text[start:end]))
 
 
-def research_substitution(original, substitute, product_sku, company_name):
+def _make_user_message(original, substitute, product_sku, company_name):
     sub_name = substitute.get("current_match_name", "unknown")
-    logger.info(
-        "Starting research: %s → %s for %s / %s",
-        original["original_ingredient"], sub_name, company_name, product_sku,
-    )
-
-    agent, max_rounds = _build_agent()
-    logger.debug("Agent built with max_rounds=%d", max_rounds)
-
-    user_message = (
+    return (
         f"Research this ingredient substitution for compliance:\n\n"
         f"PRODUCT: {company_name} — {product_sku}\n"
         f"ORIGINAL INGREDIENT: {original['original_ingredient']} "
@@ -134,23 +126,78 @@ def research_substitution(original, substitute, product_sku, company_name):
         f"labeling implications, certification issues, and bioavailability differences."
     )
 
-    logger.debug("Streaming agent for %s → %s", original["original_ingredient"], sub_name)
-    result = None
+
+def _extract_tool_calls(messages):
+    """Extract tool call info from a list of messages."""
+    calls = []
+    for msg in messages:
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
+            for tc in msg.tool_calls:
+                calls.append({"name": tc.get("name", "unknown"), "args": tc.get("args", {})})
+    return calls
+
+
+def _extract_tool_results(messages):
+    """Extract tool result snippets from a list of messages."""
+    results = []
+    for msg in messages:
+        if hasattr(msg, "content") and getattr(msg, "type", None) == "tool":
+            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            results.append({"name": getattr(msg, "name", "tool"), "snippet": content[:200]})
+    return results
+
+
+def _extract_text(messages):
+    """Extract assistant text content from messages."""
+    texts = []
+    for msg in messages:
+        if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content.strip():
+            if not (hasattr(msg, "tool_calls") and msg.tool_calls):
+                texts.append(msg.content)
+    return texts
+
+
+def research_substitution_stream(original, substitute, product_sku, company_name):
+    """Generator that yields (event_type, data) tuples during research.
+
+    Event types:
+      - ("tool_call", {"name": ..., "args": ...})
+      - ("tool_result", {"name": ..., "snippet": ...})
+      - ("thinking", str)  — assistant text between tool rounds
+      - ("result", dict)   — final verdict dict
+    """
+    sub_name = substitute.get("current_match_name", "unknown")
+    logger.info(
+        "Starting research: %s → %s for %s / %s",
+        original["original_ingredient"], sub_name, company_name, product_sku,
+    )
+
+    agent, max_rounds = _build_agent()
+    user_message = _make_user_message(original, substitute, product_sku, company_name)
+
+    last_model_messages = None
     for chunk in agent.stream(
         {"messages": [{"role": "user", "content": user_message}]},
         config={"recursion_limit": max_rounds * 2},
         stream_mode="updates",
     ):
-        result = chunk
+        if "model" in chunk and "messages" in chunk["model"]:
+            msgs = chunk["model"]["messages"]
+            last_model_messages = msgs
+            for tc in _extract_tool_calls(msgs):
+                yield ("tool_call", tc)
+            for text in _extract_text(msgs):
+                yield ("thinking", text)
 
-    if result is None:
-        raise RuntimeError(f"Agent stream produced no output for {original['original_ingredient']} → {sub_name}")
+        if "tools" in chunk and "messages" in chunk["tools"]:
+            for tr in _extract_tool_results(chunk["tools"]["messages"]):
+                yield ("tool_result", tr)
 
-    messages = result.get("messages", [])
-    if not messages:
-        raise RuntimeError(f"No messages in agent output for {original['original_ingredient']} → {sub_name}")
+    if not last_model_messages:
+        raise RuntimeError(f"Agent produced no model output for {original['original_ingredient']} → {sub_name}")
 
-    final_text = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
+    final_msg = last_model_messages[-1]
+    final_text = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
     verdict = _parse_verdict(final_text)
 
     logger.info(
@@ -158,7 +205,7 @@ def research_substitution(original, substitute, product_sku, company_name):
         original["original_ingredient"], sub_name,
         len(verdict.facts), len(verdict.rules), len(verdict.evidence_rows),
     )
-    return {
+    result = {
         "facts": verdict.facts,
         "rules": verdict.rules,
         "inference": verdict.inference,
@@ -166,3 +213,14 @@ def research_substitution(original, substitute, product_sku, company_name):
         "evidence_rows": [row.model_dump() for row in verdict.evidence_rows],
         "kb_sources": [],
     }
+    yield ("result", result)
+
+
+def research_substitution(original, substitute, product_sku, company_name):
+    result = None
+    for event_type, data in research_substitution_stream(original, substitute, product_sku, company_name):
+        if event_type == "result":
+            result = data
+    if result is None:
+        raise RuntimeError("research_substitution_stream did not yield a result")
+    return result
