@@ -1,14 +1,47 @@
 import json
 import logging
+import re
 
 from src.common.db import (
     create_research_job,
+    get_supplier_id_by_name,
     update_research_job,
+    upsert_supplier_spec,
 )
 from src.compliance.research_agent import research_substitution
 from src.substitute.find_candidates import find_candidates_for_component
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_and_persist_specs(db_path, evidence_rows, component_product_id):
+    for row in evidence_rows:
+        if not row.get("fact_type", "").startswith("spec:"):
+            continue
+        source_label = row.get("source_label", "")
+        supplier_name_match = re.match(r"^(.+?)\s+TDS\s+for\s+", source_label)
+        if not supplier_name_match:
+            logger.warning("Cannot parse supplier name from source_label: %s", source_label)
+            continue
+        supplier_name = supplier_name_match.group(1)
+        supplier_id = get_supplier_id_by_name(db_path=db_path, supplier_name=supplier_name)
+        if supplier_id is None:
+            logger.warning("Supplier not found: %s (from source_label: %s)", supplier_name, source_label)
+            continue
+        spec_key = row["fact_type"].removeprefix("spec:")
+        value = row.get("fact_value", "")
+        unit_match = re.search(r"(%|ppm|mg|mcg|CFU/g|mesh)$", value.strip())
+        spec_unit = unit_match.group(0) if unit_match else None
+        upsert_supplier_spec(
+            db_path=db_path,
+            supplier_id=supplier_id,
+            product_id=component_product_id,
+            spec_key=spec_key,
+            spec_value=value,
+            spec_unit=spec_unit,
+            source_uri=row.get("source_uri"),
+            source_type=row.get("source_type", "tds"),
+        )
 
 
 def run_research(db_path=None, product=None, component=None):
@@ -80,6 +113,11 @@ def run_research(db_path=None, product=None, component=None):
                 "caveats": verdict["caveats"],
                 "evidence_rows": verdict["evidence_rows"],
             })
+            _extract_and_persist_specs(
+                db_path=db_path,
+                evidence_rows=verdict["evidence_rows"],
+                component_product_id=component["product_id"],
+            )
 
         result_json = json.dumps({"candidates_researched": candidates_researched})
         update_research_job(db_path=db_path, job_id=job_id, status="completed", result_json=result_json)
