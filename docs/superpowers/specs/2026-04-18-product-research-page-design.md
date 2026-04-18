@@ -31,9 +31,9 @@ For the selected product, one row per BOM component showing:
 
 | Column | Source |
 |--------|--------|
-| Ingredient Name | `parse_ingredient_name(component.sku)` |
-| SKU | `component.sku` |
-| Supplier(s) | `get_suppliers_for_product(component.product_id)` |
+| Ingredient Name | `parse_ingredient_name(component["sku"])` |
+| SKU | `component["sku"]` |
+| Supplier(s) | `get_suppliers_for_product(product_id=component["product_id"])` |
 | Exact Matches | Count of exact-match candidates from `find_candidates_for_component()` |
 | Alias Matches | Count of alias/hypothesis candidates |
 | Research Status | From `Research_Job` table: none / pending / running / completed / failed |
@@ -89,10 +89,12 @@ The `Research_Job` table is added to `init_workspace_schema()` in `src/common/db
 
 ### New Functions in `src/common/db.py`
 
-- `create_research_job(product_id, component_product_id)` — insert `pending` row, return job ID
-- `update_research_job(job_id, status, result_json=None, error_message=None)` — update status and result
-- `get_latest_research_job(product_id, component_product_id)` — return the most recent job for this pair
-- `get_research_jobs_for_product(product_id)` — return latest job per component for the whole product
+- `create_research_job(db_path, product_id, component_product_id)` — insert `pending` row, return job ID
+- `update_research_job(db_path, job_id, status, result_json=None, error_message=None)` — update status and result
+- `get_latest_research_job(db_path, product_id, component_product_id)` — return the most recent job for this pair
+- `get_research_jobs_for_product(db_path, product_id)` — return latest job per component for the whole product
+
+All functions follow the existing `db_path=None` convention used throughout `src/common/db.py`.
 
 ## Background Research Mechanism
 
@@ -101,26 +103,34 @@ The `Research_Job` table is added to `init_workspace_schema()` in `src/common/db
 When "Find substitution" is clicked:
 
 1. `create_research_job()` inserts a `pending` row
-2. A `threading.Thread` is spawned targeting `_run_research(job_id, product, component)`
+2. A `threading.Thread` is spawned targeting `run_research(job_id, product, component)`
 3. The thread:
    - Updates job to `running`
    - Calls `find_candidates_for_component()` to get exact + alias candidates
-   - Builds the context (requirements, canonical names, existing matches)
-   - Calls `research_substitution()` from the existing research agent spec
-   - On success: updates job to `completed` with `ResultJson` containing the full verdict
+   - Builds the `original_info` dict with ingredient name, canonical names, and group function
+   - For each candidate, calls `research_substitution(original, substitute, product_sku, company_name)` from `src/compliance/research_agent.py`
+   - On success: updates job to `completed` with `ResultJson` containing aggregated results
    - On failure: updates job to `failed` with `ErrorMessage`
 4. The page shows "Research in progress..." for that ingredient
 5. A "Refresh" button at the top of the page triggers `st.rerun()` to poll status
 
 ### Research Agent Integration
 
-Uses `research_substitution()` from `src/compliance/research_agent.py` (the DeepAgents-based agent from the existing spec). The agent receives:
+Uses `research_substitution()` from `src/compliance/research_agent.py` (already implemented). The function signature is:
 
-- Original ingredient info (name, canonical name, requirements from `build_requirement_profile()`)
-- All candidates (exact + alias + hypothesis) as context — these inform the agent but are not standalone findings
-- Product SKU and company name for product-level context
+```python
+research_substitution(original, substitute, product_sku, company_name)
+```
 
-The system prompt instructs the agent that exact/alias matches are **hints for understanding ingredient identity**, not conclusions. The agent must independently verify equivalence through its tools (PubChem, FDA, web search, document store).
+Where:
+- `original` — dict with keys `original_ingredient`, `group` (dict with `canonical_name`, `function`), `requirements` (list)
+- `substitute` — dict with keys `current_match_name`, `match_type`
+- `product_sku` — string
+- `company_name` — string
+
+Returns a dict with keys: `facts`, `rules`, `inference`, `caveats`, `evidence_rows`, `kb_sources`.
+
+The background runner builds these inputs from `find_candidates_for_component()` output, following the same pattern as `scripts/research.py` lines 124-148.
 
 ### Result Format
 
@@ -128,44 +138,42 @@ The system prompt instructs the agent that exact/alias matches are **hints for u
 
 ```json
 {
-  "facts": ["..."],
-  "rules": ["..."],
-  "inference": "...",
-  "caveats": ["..."],
-  "evidence_rows": [
-    {
-      "source_type": "pubchem",
-      "source_label": "PubChem compound lookup",
-      "source_uri": "https://pubchem.ncbi.nlm.nih.gov/compound/54670067",
-      "fact_type": "chemical_identity",
-      "fact_value": "Ascorbic acid (CID 54670067) is the L-enantiomer of vitamin C",
-      "quality_score": 0.95,
-      "snippet": "IUPAC: (2R)-2-[(1S)-1,2-dihydroxyethyl]-..."
-    }
-  ],
   "candidates_researched": [
     {
       "name": "ascorbic-acid",
       "match_type": "alias",
-      "verdict": "safe"
+      "facts": ["Ascorbic acid is the same chemical entity as vitamin C"],
+      "rules": ["FDA 21 CFR 101.36"],
+      "inference": "Chemically identical substitute.",
+      "caveats": ["No dosage equivalence data available"],
+      "evidence_rows": [
+        {
+          "source_type": "pubchem",
+          "source_label": "PubChem compound lookup",
+          "source_uri": "https://pubchem.ncbi.nlm.nih.gov/compound/54670067",
+          "fact_type": "chemical_identity",
+          "fact_value": "Ascorbic acid (CID 54670067) is the L-enantiomer of vitamin C",
+          "quality_score": 0.95,
+          "snippet": "IUPAC: (2R)-2-[(1S)-1,2-dihydroxyethyl]-..."
+        }
+      ]
     }
   ]
 }
 ```
 
-## Dependencies
-
-This design depends on the research agent from `docs/superpowers/specs/2026-04-18-agentic-research-design.md` being implemented (Tasks 1-7 of the existing plan: dependencies, 5 tools, agent core). If the agent is not yet available, the page still works — "Find substitution" will show an error and the user can retry later.
+Each entry in `candidates_researched` corresponds to one `research_substitution()` call. If only exact/alias matches exist with no real candidates, the result stores an empty list with a note.
 
 ## Files to Create/Modify
 
 | File | Action |
 |------|--------|
 | `pages/6_Product_Research.py` | Create — new Streamlit page |
-| `src/common/db.py` | Modify — add `Research_Job` table to schema, add job CRUD functions |
+| `src/common/db.py` | Modify — add `Research_Job` table to `init_workspace_schema()`, add 4 job CRUD functions |
 | `src/research/__init__.py` | Create — new package marker |
-| `src/research/run.py` | Create — background research runner function |
-| `tests/test_research_page.py` | Create — tests for job CRUD and research runner |
+| `src/research/run.py` | Create — `run_research()` background runner function |
+| `tests/test_research_job.py` | Create — tests for job CRUD functions |
+| `tests/test_research_run.py` | Create — tests for background runner |
 
 ## Out of Scope
 
