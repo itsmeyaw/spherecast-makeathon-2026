@@ -107,38 +107,62 @@ The provided SQLite database contains:
 
 - Docker and Docker Compose
 - AWS account with Bedrock access (Claude model enabled)
-- AWS credentials with permissions for S3, Bedrock, and Bedrock Agent Runtime
+- AWS CLI configured locally (`aws configure`) or IAM credentials ready
 
-### 1. Configure Environment
+### 1. Enable Claude on Bedrock
+
+1. Go to **AWS Console > Amazon Bedrock > Model access** (in `us-east-1`)
+2. Click **Manage model access**
+3. Select **Anthropic > Claude 3.5 Sonnet** (or whichever Claude model you want to use)
+4. Click **Save changes** — access is typically granted within a few minutes
+
+### 2. Create an S3 Bucket
+
+1. Go to **AWS Console > S3 > Create bucket**
+2. Bucket name: `agnes-hackathon-kb` (or any name you prefer)
+3. Region: `us-east-1` (must match Bedrock region)
+4. Leave all other settings as defaults, click **Create bucket**
+
+### 3. Create a Bedrock Knowledge Base
+
+1. Go to **AWS Console > Amazon Bedrock > Knowledge bases** (left sidebar under "Orchestration")
+2. Click **Create knowledge base**
+3. Name: `agnes-product-kb`
+4. IAM role: let the console create a new service role
+5. Data source: choose **Amazon S3**
+6. S3 URI: `s3://agnes-hackathon-kb/` (the bucket from step 2)
+7. Embedding model: **Titan Embeddings G1 - Text** (or any available embedding model)
+8. Vector store: choose **Quick create a new vector store** (uses OpenSearch Serverless)
+9. Click **Create knowledge base**
+10. **Copy the Knowledge Base ID** (e.g., `ABCDE12345`) — you'll need it for `.env`
+
+### 4. Create IAM Credentials (if not using AWS CLI profile)
+
+1. Go to **AWS Console > IAM > Users > Create user**
+2. Attach these managed policies:
+   - `AmazonS3FullAccess`
+   - `AmazonBedrockFullAccess`
+3. Go to **Security credentials > Create access key**
+4. Copy the **Access Key ID** and **Secret Access Key**
+
+### 5. Configure Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your AWS credentials:
+Edit `.env` with your values:
 
 ```
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_DEFAULT_REGION=us-east-1
 S3_BUCKET_NAME=agnes-hackathon-kb
-KNOWLEDGE_BASE_ID=your-kb-id
+KNOWLEDGE_BASE_ID=your-kb-id-from-step-3
 BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-20250514
 ```
 
-### 2. Create S3 Bucket
-
-```bash
-docker compose run app python scripts/setup_kb.py
-```
-
-### 3. Create Knowledge Base
-
-1. Go to **AWS Console > Bedrock > Knowledge bases**
-2. Create a new Knowledge Base pointing to `s3://agnes-hackathon-kb/`
-3. Copy the Knowledge Base ID into your `.env` file as `KNOWLEDGE_BASE_ID`
-
-### 4. Scrape Product Pages
+### 6. Scrape Product Pages
 
 ```bash
 # Scrape all 149 finished goods (takes ~10 min with rate limiting)
@@ -148,9 +172,9 @@ docker compose run app python -c "from src.scraper.scrape import scrape_all_prod
 docker compose run app python src/scraper/upload_to_s3.py
 ```
 
-After uploading, sync/re-index the Knowledge Base in the AWS Console.
+After uploading, go back to **Bedrock > Knowledge bases > agnes-product-kb** and click **Sync** to re-index the new documents.
 
-### 5. Run Ingredient Normalization
+### 7. Run Ingredient Normalization
 
 ```bash
 docker compose run app python -m src.normalize.group_ingredients
@@ -158,7 +182,7 @@ docker compose run app python -m src.normalize.group_ingredients
 
 This groups 357 ingredient names into functional equivalence classes and saves them to the `Ingredient_Group` table in SQLite.
 
-### 6. Launch the App
+### 8. Launch the App
 
 ```bash
 docker compose up
