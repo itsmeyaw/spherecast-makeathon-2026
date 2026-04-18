@@ -12,7 +12,6 @@ from src.common.db import (
 
 def _init_test_db(tmp_path):
     db_path = str(tmp_path / "test.db")
-    import sqlite3
     conn = sqlite3.connect(db_path)
     conn.execute("CREATE TABLE Product (Id INTEGER PRIMARY KEY, SKU TEXT, CompanyId INTEGER, Type TEXT)")
     conn.execute("INSERT INTO Product VALUES (1, 'FG-test-001', 1, 'finished-good')")

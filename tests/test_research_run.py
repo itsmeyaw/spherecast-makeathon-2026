@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.common.db import (
     init_workspace_schema,
