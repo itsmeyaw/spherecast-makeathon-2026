@@ -34,7 +34,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_spec_key
 ```
 
 - **SupplierId + ProductId + SpecKey** is unique — upserts overwrite stale data.
-- **ProductId** references a raw-material `Product` row (the BOM component's product).
+- **ProductId** references a raw-material `Product` row (the BOM component's product). Different Product IDs from the same supplier can have different specifications (e.g., the same supplier may offer vitamin-c at 98% purity under one SKU and 99.5% under another). The unique index captures this: specs are per supplier-product pair, not per supplier alone.
 - **SpecKey** uses a standardized vocabulary (below) but accepts arbitrary keys for novel TDS fields.
 - **SpecValue** is always text; numeric comparisons happen in Python.
 - **SpecUnit** is nullable (e.g., NULL for text values like "USP").
@@ -110,11 +110,15 @@ For each ingredient:
 3. Extract specification key-value pairs from the results.
 4. Include spec differences across suppliers in your evidence and caveats.
 
+Important: the same supplier can offer the same substance under different product
+SKUs with different specifications (e.g., different purity grades). Treat each
+supplier-product combination as a distinct spec source, not just each supplier.
+
 When reporting evidence_rows for TDS/spec findings, use:
 - source_type: "tds"
 - fact_type: "spec:<key>" (e.g., "spec:purity", "spec:heavy_metals_lead")
 - fact_value: the extracted value with unit (e.g., "99.5%", "< 0.5 ppm")
-- source_label: include supplier name (e.g., "ADM TDS for Vitamin C")
+- source_label: include supplier name and product SKU (e.g., "ADM TDS for RM-vitamin-c-123")
 ```
 
 ### Spec Persistence Flow
