@@ -6,3 +6,5 @@ lxml
 pytest
 psycopg2-binary
 markitdown
+deepagents
+langchain-aws
