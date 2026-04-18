@@ -67,29 +67,28 @@ def test_research_substitution_excluded_tools_when_no_brave_key():
     assert "web_search" not in tool_names
 
 
-def test_research_substitution_with_structured_response():
-    from src.compliance.research_agent import SubstitutionVerdict, EvidenceRow
-
-    verdict = SubstitutionVerdict(
-        facts=["Ascorbic acid is vitamin C"],
-        rules=["FDA allows name variants"],
-        inference="Chemically identical.",
-        caveats=["No dosage data"],
-        evidence_rows=[
-            EvidenceRow(
-                source_type="pgvector",
-                source_label="Doc search",
-                source_uri="s3://docs/product.json",
-                fact_type="product_context",
-                fact_value="Contains vitamin C",
-                quality_score=0.9,
-                snippet="Vitamin C (as Ascorbic Acid) 1000mg",
-            )
+def test_research_substitution_with_list_content():
+    import json as _json
+    verdict_json = _json.dumps({
+        "facts": ["Ascorbic acid is vitamin C"],
+        "rules": ["FDA allows name variants"],
+        "inference": "Chemically identical.",
+        "caveats": ["No dosage data"],
+        "evidence_rows": [
+            {
+                "source_type": "pgvector",
+                "source_label": "Doc search",
+                "source_uri": "s3://docs/product.json",
+                "fact_type": "product_context",
+                "fact_value": "Contains vitamin C",
+                "quality_score": 0.9,
+                "snippet": "Vitamin C (as Ascorbic Acid) 1000mg",
+            }
         ],
-    )
+    })
     mock_agent = MagicMock()
     mock_agent.stream.return_value = iter([
-        {"model": {"messages": [AIMessage(content="tool call")], "structured_response": verdict}},
+        {"model": {"messages": [AIMessage(content=[{"type": "text", "text": verdict_json}])]}},
     ])
 
     with patch("src.compliance.research_agent.create_deep_agent", return_value=mock_agent):

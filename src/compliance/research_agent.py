@@ -58,12 +58,27 @@ When reporting evidence_rows for TDS/spec findings, use:
 - fact_value: the extracted value with unit (e.g., "99.5%", "< 0.5 ppm")
 - source_label: include supplier name and product SKU (e.g., "ADM TDS for RM-vitamin-c-123")
 
-Your final response will be automatically parsed into a structured format. \
-Populate every field: facts (list of factual findings), rules (applicable \
-regulations), inference (your overall compliance verdict), caveats (uncertainties \
-or limitations), and evidence_rows (source citations with quality scores 0-1). \
-For evidence_rows use source_type values like: pgvector, sqlite, web-search, \
-pubchem, fda-api, or tds.
+CRITICAL OUTPUT REQUIREMENT — your final message MUST be a single raw JSON object \
+with NO markdown fences, NO preamble text, NO explanation before or after. \
+If you write anything other than valid JSON as your final message, the system \
+will fail. The JSON must match this schema exactly:
+{
+  "facts": ["string", ...],
+  "rules": ["string", ...],
+  "inference": "string",
+  "caveats": ["string", ...],
+  "evidence_rows": [
+    {
+      "source_type": "pgvector|sqlite|web-search|pubchem|fda-api|tds",
+      "source_label": "string",
+      "source_uri": "string",
+      "fact_type": "string",
+      "fact_value": "string",
+      "quality_score": 0.0-1.0,
+      "snippet": "string"
+    }
+  ]
+}
 """
 
 
@@ -109,7 +124,6 @@ def _build_agent():
         model=llm,
         tools=_build_tools(),
         system_prompt=RESEARCH_SYSTEM_PROMPT,
-        response_format=SubstitutionVerdict,
     ), max_rounds
 
 
@@ -210,27 +224,20 @@ def research_substitution_stream(original, substitute, product_sku, company_name
                 for text in _extract_text(msgs):
                     yield ("thinking", text)
 
-                sr = chunk["model"].get("structured_response")
-                if sr is not None:
-                    verdict = sr if isinstance(sr, SubstitutionVerdict) else SubstitutionVerdict.model_validate(sr)
-
             if "tools" in chunk and "messages" in chunk["tools"]:
                 for tr in _extract_tool_results(chunk["tools"]["messages"]):
                     yield ("tool_result", tr)
     except Exception:
         logger.exception("Stream error during research: %s → %s (chunks seen: %s)", original["original_ingredient"], sub_name, chunk_keys_seen)
-        if verdict is None and last_model_messages:
-            logger.info("Attempting to parse verdict from last model messages before stream error")
-        else:
+        if not last_model_messages:
             raise
 
-    if verdict is None and last_model_messages:
-        final_msg = last_model_messages[-1]
-        final_content = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
-        verdict = _parse_verdict(final_content)
-
-    if verdict is None:
+    if not last_model_messages:
         raise RuntimeError(f"Agent produced no output for {original['original_ingredient']} → {sub_name} (chunk keys seen: {chunk_keys_seen})")
+
+    final_msg = last_model_messages[-1]
+    final_content = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
+    verdict = _parse_verdict(final_content)
 
     logger.info(
         "Research complete: %s → %s — %d facts, %d rules, %d evidence rows",
