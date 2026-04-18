@@ -228,6 +228,19 @@ def init_workspace_schema(db_path=None):
             FOREIGN KEY (OpportunityId) REFERENCES Opportunity (Id)
         );
 
+        CREATE TABLE IF NOT EXISTS Research_Job (
+            Id INTEGER PRIMARY KEY,
+            ProductId INTEGER NOT NULL,
+            BomComponentProductId INTEGER NOT NULL,
+            Status TEXT NOT NULL CHECK (Status IN ('pending', 'running', 'completed', 'failed')),
+            ResultJson TEXT,
+            ErrorMessage TEXT,
+            CreatedAt TEXT NOT NULL,
+            UpdatedAt TEXT NOT NULL,
+            FOREIGN KEY (ProductId) REFERENCES Product (Id),
+            FOREIGN KEY (BomComponentProductId) REFERENCES Product (Id)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_ingredient_alias_alias_name
             ON Ingredient_Alias (AliasName, Approved);
         CREATE INDEX IF NOT EXISTS idx_opportunity_status
@@ -240,6 +253,8 @@ def init_workspace_schema(db_path=None):
             ON Requirement_Profile (ProductId, BomComponentProductId);
         CREATE INDEX IF NOT EXISTS idx_review_decision_opportunity
             ON Review_Decision (OpportunityId, CreatedAt);
+        CREATE INDEX IF NOT EXISTS idx_research_job_lookup
+            ON Research_Job (ProductId, BomComponentProductId, Status);
         """
     )
     conn.commit()
