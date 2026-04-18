@@ -65,3 +65,13 @@ def test_research_substitution_excluded_tools_when_no_brave_key():
     assert "search_documents" in tool_names
     assert "query_database" in tool_names
     assert "web_search" not in tool_names
+
+
+def test_build_tools_includes_search_tds():
+    with patch("src.compliance.research_agent.create_deep_agent"):
+        with patch("src.compliance.research_agent.ChatBedrockConverse"):
+            from src.compliance.research_agent import _build_tools
+            tools = _build_tools()
+
+    tool_names = [t.__name__ for t in tools]
+    assert "search_tds" in tool_names

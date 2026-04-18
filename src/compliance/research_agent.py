@@ -11,6 +11,7 @@ from src.compliance.tools.fda_lookup import fda_lookup
 from src.compliance.tools.pubchem_lookup import pubchem_lookup
 from src.compliance.tools.query_database import query_database
 from src.compliance.tools.search_documents import search_documents
+from src.compliance.tools.search_tds import search_tds
 from src.compliance.tools.web_search import web_search
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,27 @@ IMPORTANT:
 - Only state facts you can support with evidence from your tools.
 - If evidence is missing, say "insufficient evidence" for that aspect.
 - Never guess about compliance — flag uncertainty explicitly.
+
+When researching a substitution, also search for Technical Data Sheets (TDS), \
+Certificates of Analysis (CoA), and fact sheets for both the original ingredient \
+and the proposed substitute. The same substance from different suppliers can have \
+different specifications (purity, heavy metals, particle size, etc.).
+
+For each ingredient:
+1. Look up which suppliers provide it (query_database with supplier_products).
+2. For each supplier, search for TDS/spec data (search_tds with supplier_name).
+3. Extract specification key-value pairs from the results.
+4. Include spec differences across suppliers in your evidence and caveats.
+
+Important: the same supplier can offer the same substance under different product \
+SKUs with different specifications (e.g., different purity grades). Treat each \
+supplier-product combination as a distinct spec source, not just each supplier.
+
+When reporting evidence_rows for TDS/spec findings, use:
+- source_type: "tds"
+- fact_type: "spec:<key>" (e.g., "spec:purity", "spec:heavy_metals_lead")
+- fact_value: the extracted value with unit (e.g., "99.5%", "< 0.5 ppm")
+- source_label: include supplier name and product SKU (e.g., "ADM TDS for RM-vitamin-c-123")
 
 When you have completed your research, respond with ONLY a JSON object (no \
 markdown fences, no preamble) matching this exact schema:
@@ -77,7 +99,7 @@ class SubstitutionVerdict(BaseModel):
 
 
 def _build_tools():
-    tools = [search_documents, query_database, pubchem_lookup, fda_lookup]
+    tools = [search_documents, query_database, pubchem_lookup, fda_lookup, search_tds]
     if os.environ.get("BRAVE_API_KEY"):
         tools.append(web_search)
     return tools
