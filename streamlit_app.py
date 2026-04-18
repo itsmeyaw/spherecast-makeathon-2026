@@ -1,6 +1,14 @@
+import logging
+import os
+
 import streamlit as st
 
 from src.opportunity.store import ensure_workspace_ready, get_workspace_metrics
+
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 st.set_page_config(page_title="Agnes Sourcing Workspace", layout="wide")
 ensure_workspace_ready()

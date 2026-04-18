@@ -49,18 +49,5 @@ rows = [
 ]
 st.dataframe(rows, use_container_width=True, hide_index=True)
 
-if opportunities:
-    selected_id = st.selectbox(
-        "Open opportunity",
-        options=[item["Id"] for item in opportunities],
-        format_func=lambda opportunity_id: f"Opportunity #{opportunity_id}",
-    )
-    col_detail, col_review = st.columns(2)
-    if col_detail.button("Open Detail"):
-        st.session_state["selected_opportunity_id"] = selected_id
-        st.switch_page("pages/3_Opportunity_Detail.py")
-    if col_review.button("Open Review"):
-        st.session_state["selected_opportunity_id"] = selected_id
-        st.switch_page("pages/4_Review.py")
-else:
+if not opportunities:
     st.info("No opportunities matched the current filters.")

@@ -1,6 +1,8 @@
+import json
 import logging
 import os
 
+from botocore.config import Config as BotoConfig
 from deepagents import create_deep_agent
 from langchain_aws import ChatBedrockConverse
 from pydantic import BaseModel
@@ -29,20 +31,41 @@ Research strategy:
    external data on the ingredient pair.
 4. Stop when you have enough evidence to make a confident verdict.
 
-For your final answer, provide:
-- facts: concrete facts you found from any source
-- rules: applicable FDA rules or regulatory requirements
-- inference: your reasoning connecting facts to rules
-- caveats: limitations, uncertainties, or missing evidence
-- evidence_rows: structured evidence for each significant finding, each with \
-  source_type (pgvector, sqlite, web-search, pubchem, fda-api), source_label, \
-  source_uri, fact_type, fact_value, quality_score (0.0-1.0), and snippet.
-
 IMPORTANT:
 - Only state facts you can support with evidence from your tools.
 - If evidence is missing, say "insufficient evidence" for that aspect.
 - Never guess about compliance — flag uncertainty explicitly.
+
+When you have completed your research, respond with ONLY a JSON object (no \
+markdown fences, no preamble) matching this exact schema:
+{
+  "facts": ["string", ...],
+  "rules": ["string", ...],
+  "inference": "string",
+  "caveats": ["string", ...],
+  "evidence_rows": [
+    {
+      "source_type": "pgvector|sqlite|web-search|pubchem|fda-api",
+      "source_label": "string",
+      "source_uri": "string",
+      "fact_type": "string",
+      "fact_value": "string",
+      "quality_score": 0.0-1.0,
+      "snippet": "string"
+    }
+  ]
+}
 """
+
+
+class EvidenceRow(BaseModel):
+    source_type: str
+    source_label: str
+    source_uri: str
+    fact_type: str
+    fact_value: str
+    quality_score: float
+    snippet: str
 
 
 class SubstitutionVerdict(BaseModel):
@@ -50,7 +73,7 @@ class SubstitutionVerdict(BaseModel):
     rules: list[str]
     inference: str
     caveats: list[str]
-    evidence_rows: list[dict]
+    evidence_rows: list[EvidenceRow]
 
 
 def _build_tools():
@@ -68,6 +91,7 @@ def _build_agent():
         model=model_id,
         provider="anthropic",
         region_name=region,
+        config=BotoConfig(read_timeout=1000, connect_timeout=10, retries={"max_attempts": 3, "mode": "adaptive"}),
     )
 
     max_rounds = int(os.environ.get("RESEARCH_MAX_ROUNDS", "20"))
@@ -76,12 +100,26 @@ def _build_agent():
         model=llm,
         tools=_build_tools(),
         system_prompt=RESEARCH_SYSTEM_PROMPT,
-        response_format=SubstitutionVerdict,
     ), max_rounds
 
 
+def _parse_verdict(text: str) -> SubstitutionVerdict:
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start == -1 or end == 0:
+        raise ValueError(f"No JSON object found in agent response: {text[:200]}")
+    return SubstitutionVerdict.model_validate(json.loads(text[start:end]))
+
+
 def research_substitution(original, substitute, product_sku, company_name):
+    sub_name = substitute.get("current_match_name", "unknown")
+    logger.info(
+        "Starting research: %s → %s for %s / %s",
+        original["original_ingredient"], sub_name, company_name, product_sku,
+    )
+
     agent, max_rounds = _build_agent()
+    logger.debug("Agent built with max_rounds=%d", max_rounds)
 
     user_message = (
         f"Research this ingredient substitution for compliance:\n\n"
@@ -89,24 +127,42 @@ def research_substitution(original, substitute, product_sku, company_name):
         f"ORIGINAL INGREDIENT: {original['original_ingredient']} "
         f"(canonical: {original['group']['canonical_name']}, "
         f"function: {original['group']['function']})\n"
-        f"PROPOSED SUBSTITUTE: {substitute.get('current_match_name', 'unknown')} "
+        f"PROPOSED SUBSTITUTE: {sub_name} "
         f"(match type: {substitute.get('match_type', 'unknown')})\n\n"
         f"Investigate whether this substitution is safe, compliant with FDA "
         f"regulations, and functionally equivalent. Check for allergen conflicts, "
         f"labeling implications, certification issues, and bioavailability differences."
     )
 
-    result = agent.invoke(
+    logger.debug("Streaming agent for %s → %s", original["original_ingredient"], sub_name)
+    result = None
+    for chunk in agent.stream(
         {"messages": [{"role": "user", "content": user_message}]},
         config={"recursion_limit": max_rounds * 2},
-    )
+        stream_mode="updates",
+    ):
+        result = chunk
 
-    verdict = result["structured_response"]
+    if result is None:
+        raise RuntimeError(f"Agent stream produced no output for {original['original_ingredient']} → {sub_name}")
+
+    messages = result.get("messages", [])
+    if not messages:
+        raise RuntimeError(f"No messages in agent output for {original['original_ingredient']} → {sub_name}")
+
+    final_text = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
+    verdict = _parse_verdict(final_text)
+
+    logger.info(
+        "Research complete: %s → %s — %d facts, %d rules, %d evidence rows",
+        original["original_ingredient"], sub_name,
+        len(verdict.facts), len(verdict.rules), len(verdict.evidence_rows),
+    )
     return {
         "facts": verdict.facts,
         "rules": verdict.rules,
         "inference": verdict.inference,
         "caveats": verdict.caveats,
-        "evidence_rows": verdict.evidence_rows,
+        "evidence_rows": [row.model_dump() for row in verdict.evidence_rows],
         "kb_sources": [],
     }

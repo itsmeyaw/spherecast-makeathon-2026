@@ -1,12 +1,18 @@
 import json
 import os
 import boto3
+from botocore.config import Config
 
 
 def get_bedrock_client():
     return boto3.client(
         "bedrock-runtime",
         region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+        config=Config(
+            read_timeout=300,
+            connect_timeout=10,
+            retries={"max_attempts": 2},
+        ),
     )
 
 
@@ -24,14 +30,19 @@ def invoke_model(prompt, system=None, model_id=None):
     if system:
         body["system"] = [{"type": "text", "text": system}]
 
-    response = client.invoke_model(
+    response = client.invoke_model_with_response_stream(
         modelId=model,
         contentType="application/json",
         accept="application/json",
         body=json.dumps(body),
     )
-    result = json.loads(response["body"].read())
-    return result["content"][0]["text"]
+
+    chunks = []
+    for event in response["body"]:
+        chunk = json.loads(event["chunk"]["bytes"])
+        if chunk["type"] == "content_block_delta":
+            chunks.append(chunk["delta"].get("text", ""))
+    return "".join(chunks)
 
 
 def invoke_model_json(prompt, system=None, model_id=None):

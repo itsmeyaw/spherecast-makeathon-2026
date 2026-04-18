@@ -1,16 +1,30 @@
 import streamlit as st
 
-from src.opportunity.store import ensure_workspace_ready, get_opportunity_detail
+from src.opportunity.store import ensure_workspace_ready, list_opportunities, get_opportunity_detail
 
 st.set_page_config(page_title="Opportunity Detail", layout="wide")
 ensure_workspace_ready()
 
-selected_id = st.session_state.get("selected_opportunity_id")
 st.title("Opportunity Detail")
 
-if not selected_id:
-    st.info("Select an opportunity from the queue first.")
+opportunities = list_opportunities()
+if not opportunities:
+    st.info("No opportunities available. Rebuild the workspace from the home page.")
     st.stop()
+
+selected_id = st.selectbox(
+    "Select opportunity",
+    options=[item["Id"] for item in opportunities],
+    format_func=lambda oid: next(
+        f"#{item['Id']} — {item['ParsedIngredientName']} ({item['company_name']} • {item['MatchType']})"
+        for item in opportunities if item["Id"] == oid
+    ),
+    index=(
+        [item["Id"] for item in opportunities].index(st.session_state["selected_opportunity_id"])
+        if st.session_state.get("selected_opportunity_id") in [item["Id"] for item in opportunities]
+        else 0
+    ),
+)
 
 detail = get_opportunity_detail(opportunity_id=selected_id)
 if not detail:

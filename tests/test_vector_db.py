@@ -26,6 +26,7 @@ class TestGetConnection:
             dbname="testdb",
             user="testuser",
             password="testpass",
+            sslmode="verify-full",
         )
         assert conn is mock_conn
 
@@ -53,4 +54,5 @@ class TestGetConnection:
             dbname="testdb",
             user="testuser",
             password="testpass",
+            sslmode="verify-full",
         )

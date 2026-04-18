@@ -530,6 +530,42 @@ def get_portfolio_usage_for_names(db_path=None, ingredient_names=None):
     return usage
 
 
+def get_suppliers_with_materials(db_path=None):
+    conn = get_connection(db_path)
+    rows = conn.execute(
+        """
+        SELECT s.Id   AS supplier_id,
+               s.Name AS supplier_name,
+               p.Id   AS product_id,
+               p.SKU  AS sku
+        FROM Supplier s
+        JOIN Supplier_Product sp ON sp.SupplierId = s.Id
+        JOIN Product p ON p.Id = sp.ProductId
+        WHERE p.Type = 'raw-material'
+        ORDER BY s.Name, p.SKU
+        """
+    ).fetchall()
+    conn.close()
+
+    suppliers = {}
+    for row in rows:
+        sid = row["supplier_id"]
+        if sid not in suppliers:
+            suppliers[sid] = {
+                "supplier_id": sid,
+                "supplier_name": row["supplier_name"],
+                "materials": [],
+            }
+        suppliers[sid]["materials"].append(
+            {
+                "product_id": row["product_id"],
+                "sku": row["sku"],
+                "ingredient_name": parse_ingredient_name(row["sku"]),
+            }
+        )
+    return list(suppliers.values())
+
+
 def table_count(db_path=None, table_name=None):
     conn = get_connection(db_path)
     row = conn.execute(f"SELECT COUNT(*) AS cnt FROM {table_name}").fetchone()

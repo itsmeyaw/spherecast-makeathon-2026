@@ -1,27 +1,31 @@
+import json
 from unittest.mock import MagicMock, patch
+
+from langchain_core.messages import AIMessage
 
 
 def test_research_substitution_returns_verdict_shape():
+    verdict_json = json.dumps({
+        "facts": ["Ascorbic acid is the same chemical entity as vitamin C"],
+        "rules": ["FDA allows chemical name variants on supplement facts panels"],
+        "inference": "The substitute is chemically identical to the original.",
+        "caveats": ["No dosage equivalence data available"],
+        "evidence_rows": [
+            {
+                "source_type": "pgvector",
+                "source_label": "Document search",
+                "source_uri": "s3://docs/product.json",
+                "fact_type": "product_context",
+                "fact_value": "Product contains vitamin C as ascorbic acid",
+                "quality_score": 0.9,
+                "snippet": "Supplement Facts: Vitamin C (as Ascorbic Acid) 1000mg",
+            }
+        ],
+    })
     mock_agent = MagicMock()
-    mock_agent.invoke.return_value = {
-        "structured_response": MagicMock(
-            facts=["Ascorbic acid is the same chemical entity as vitamin C"],
-            rules=["FDA allows chemical name variants on supplement facts panels"],
-            inference="The substitute is chemically identical to the original.",
-            caveats=["No dosage equivalence data available"],
-            evidence_rows=[
-                {
-                    "source_type": "pgvector",
-                    "source_label": "Document search",
-                    "source_uri": "s3://docs/product.json",
-                    "fact_type": "product_context",
-                    "fact_value": "Product contains vitamin C as ascorbic acid",
-                    "quality_score": 0.9,
-                    "snippet": "Supplement Facts: Vitamin C (as Ascorbic Acid) 1000mg",
-                }
-            ],
-        )
-    }
+    mock_agent.stream.return_value = iter([
+        {"messages": [AIMessage(content=verdict_json)]},
+    ])
 
     with patch("src.compliance.research_agent.create_deep_agent", return_value=mock_agent):
         with patch("src.compliance.research_agent.ChatBedrockConverse"):
@@ -45,10 +49,11 @@ def test_research_substitution_returns_verdict_shape():
     assert "evidence_rows" in result
     assert isinstance(result["facts"], list)
     assert isinstance(result["evidence_rows"], list)
+    assert result["evidence_rows"][0]["source_type"] == "pgvector"
 
 
 def test_research_substitution_excluded_tools_when_no_brave_key():
-    with patch("src.compliance.research_agent.create_deep_agent") as mock_create:
+    with patch("src.compliance.research_agent.create_deep_agent"):
         with patch("src.compliance.research_agent.ChatBedrockConverse"):
             with patch.dict("os.environ", {}, clear=False):
                 import os

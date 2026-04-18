@@ -5,3 +5,5 @@ __pycache__
 data/
 .claude/worktrees/
 .worktrees/
+.playwright-mcp
+.pytest_cache/
