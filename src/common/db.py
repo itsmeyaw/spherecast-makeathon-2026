@@ -535,3 +535,69 @@ def table_count(db_path=None, table_name=None):
     row = conn.execute(f"SELECT COUNT(*) AS cnt FROM {table_name}").fetchone()
     conn.close()
     return row["cnt"]
+
+
+def create_research_job(db_path=None, product_id=None, component_product_id=None):
+    conn = get_connection(db_path)
+    now = now_iso()
+    conn.execute(
+        """
+        INSERT INTO Research_Job (ProductId, BomComponentProductId, Status, CreatedAt, UpdatedAt)
+        VALUES (?, ?, 'pending', ?, ?)
+        """,
+        (product_id, component_product_id, now, now),
+    )
+    job_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+    conn.commit()
+    conn.close()
+    return job_id
+
+
+def update_research_job(db_path=None, job_id=None, status=None, result_json=None, error_message=None):
+    conn = get_connection(db_path)
+    conn.execute(
+        """
+        UPDATE Research_Job
+        SET Status = ?, ResultJson = ?, ErrorMessage = ?, UpdatedAt = ?
+        WHERE Id = ?
+        """,
+        (status, result_json, error_message, now_iso(), job_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_latest_research_job(db_path=None, product_id=None, component_product_id=None):
+    conn = get_connection(db_path)
+    row = conn.execute(
+        """
+        SELECT *
+        FROM Research_Job
+        WHERE ProductId = ? AND BomComponentProductId = ?
+        ORDER BY Id DESC
+        LIMIT 1
+        """,
+        (product_id, component_product_id),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_research_jobs_for_product(db_path=None, product_id=None):
+    conn = get_connection(db_path)
+    rows = conn.execute(
+        """
+        SELECT rj.*
+        FROM Research_Job rj
+        INNER JOIN (
+            SELECT BomComponentProductId, MAX(Id) AS MaxId
+            FROM Research_Job
+            WHERE ProductId = ?
+            GROUP BY BomComponentProductId
+        ) latest ON rj.Id = latest.MaxId
+        ORDER BY rj.Id DESC
+        """,
+        (product_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
