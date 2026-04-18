@@ -3,3 +3,4 @@ boto3
 httpx
 beautifulsoup4
 lxml
+pytest

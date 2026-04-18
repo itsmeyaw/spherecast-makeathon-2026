@@ -1,24 +1,20 @@
-import sqlite3
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.common.db import init_workspace_schema, seed_default_ingredient_aliases
 
 DB_PATH = "db.sqlite"
 
 
 def init_db(db_path=None):
-    conn = sqlite3.connect(db_path or DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS Ingredient_Group (
-            id INTEGER PRIMARY KEY,
-            canonical_name TEXT NOT NULL,
-            function TEXT NOT NULL,
-            members TEXT NOT NULL,
-            confidence TEXT CHECK (confidence IN ('high', 'medium', 'low')),
-            reasoning TEXT
-        )
-    """)
-    conn.commit()
-    print("Ingredient_Group table ready.")
-    conn.close()
+    target = db_path or DB_PATH
+    init_workspace_schema(target)
+    seed_default_ingredient_aliases(target)
+    print("Workspace tables ready and default ingredient aliases seeded.")
 
 
 if __name__ == "__main__":
