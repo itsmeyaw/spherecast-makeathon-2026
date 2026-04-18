@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./db.sqlite:/app/db.sqlite
+      - ./src:/app/src
+    env_file:
+      - .env
