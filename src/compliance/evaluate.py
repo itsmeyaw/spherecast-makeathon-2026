@@ -1,5 +1,6 @@
-from src.reasoning.compare import compare_candidate
-from src.reasoning.explain import explain_candidate
+import json
+from src.common.bedrock import invoke_model_json
+from src.common.vector_store import retrieve
 
 
 def evaluate_substitution(original, substitute, product_sku, company_name):
