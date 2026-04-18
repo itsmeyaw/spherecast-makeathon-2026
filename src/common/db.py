@@ -241,6 +241,23 @@ def init_workspace_schema(db_path=None):
             FOREIGN KEY (BomComponentProductId) REFERENCES Product (Id)
         );
 
+        CREATE TABLE IF NOT EXISTS Supplier_Spec (
+            Id INTEGER PRIMARY KEY,
+            SupplierId INTEGER NOT NULL,
+            ProductId INTEGER NOT NULL,
+            SpecKey TEXT NOT NULL,
+            SpecValue TEXT NOT NULL,
+            SpecUnit TEXT,
+            SourceUri TEXT,
+            SourceType TEXT,
+            ExtractedAt TEXT NOT NULL,
+            FOREIGN KEY (SupplierId) REFERENCES Supplier (Id),
+            FOREIGN KEY (ProductId) REFERENCES Product (Id)
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_spec_key
+            ON Supplier_Spec (SupplierId, ProductId, SpecKey);
+
         CREATE INDEX IF NOT EXISTS idx_ingredient_alias_alias_name
             ON Ingredient_Alias (AliasName, Approved);
         CREATE INDEX IF NOT EXISTS idx_opportunity_status
@@ -637,3 +654,50 @@ def get_research_jobs_for_product(db_path=None, product_id=None):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def upsert_supplier_spec(db_path=None, supplier_id=None, product_id=None,
+                         spec_key=None, spec_value=None, spec_unit=None,
+                         source_uri=None, source_type=None):
+    conn = get_connection(db_path)
+    conn.execute(
+        """
+        INSERT INTO Supplier_Spec (SupplierId, ProductId, SpecKey, SpecValue, SpecUnit, SourceUri, SourceType, ExtractedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (SupplierId, ProductId, SpecKey)
+        DO UPDATE SET SpecValue = excluded.SpecValue,
+                      SpecUnit = excluded.SpecUnit,
+                      SourceUri = excluded.SourceUri,
+                      SourceType = excluded.SourceType,
+                      ExtractedAt = excluded.ExtractedAt
+        """,
+        (supplier_id, product_id, spec_key, spec_value, spec_unit, source_uri, source_type, now_iso()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_supplier_specs(db_path=None, product_id=None):
+    conn = get_connection(db_path)
+    rows = conn.execute(
+        """
+        SELECT ss.*, s.Name AS SupplierName
+        FROM Supplier_Spec ss
+        JOIN Supplier s ON s.Id = ss.SupplierId
+        WHERE ss.ProductId = ?
+        ORDER BY s.Name, ss.SpecKey
+        """,
+        (product_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_supplier_id_by_name(db_path=None, supplier_name=None):
+    conn = get_connection(db_path)
+    row = conn.execute(
+        "SELECT Id FROM Supplier WHERE Name = ?",
+        (supplier_name,),
+    ).fetchone()
+    conn.close()
+    return row["Id"] if row else None
