@@ -1,6 +1,6 @@
 import json
 from src.common.bedrock import invoke_model_json
-from src.common.knowledge_base import retrieve
+from src.common.vector_store import retrieve
 
 
 def evaluate_substitution(original, substitute, product_sku, company_name):
