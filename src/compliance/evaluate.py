@@ -1,8 +1,10 @@
 import json
 import logging
+import os
 
 from src.common.bedrock import invoke_model_json
 from src.common.vector_store import retrieve
+from src.compliance.research_agent import research_substitution
 from src.reasoning.compare import compare_candidate
 from src.reasoning.explain import explain_candidate
 
@@ -88,16 +90,35 @@ Return a JSON object:
 def evaluate_substitution(original, substitute, product_sku, company_name):
     blocker_result = _blocker_evaluation(original, substitute, product_sku)
 
+    research_enabled = os.environ.get("RESEARCH_ENABLED", "true").lower() == "true"
+
     rag_result = {}
-    try:
-        rag_result = _rag_evaluation(original, substitute, product_sku, company_name)
-    except Exception:
-        logger.warning(
-            "RAG evaluation unavailable for %s → %s, using blocker engine only",
-            original["original_ingredient"],
-            substitute.get("current_match_name") or substitute.get("ingredient_name"),
-            exc_info=True,
-        )
+    if research_enabled:
+        try:
+            rag_result = research_substitution(
+                original=original,
+                substitute=substitute,
+                product_sku=product_sku,
+                company_name=company_name,
+            )
+        except Exception:
+            logger.warning(
+                "Research agent failed for %s → %s, falling back to RAG",
+                original["original_ingredient"],
+                substitute.get("current_match_name") or substitute.get("ingredient_name"),
+                exc_info=True,
+            )
+
+    if not rag_result:
+        try:
+            rag_result = _rag_evaluation(original, substitute, product_sku, company_name)
+        except Exception:
+            logger.warning(
+                "RAG evaluation also unavailable for %s → %s, using blocker engine only",
+                original["original_ingredient"],
+                substitute.get("current_match_name") or substitute.get("ingredient_name"),
+                exc_info=True,
+            )
 
     rag_facts = rag_result.get("facts", [])
     rag_rules = rag_result.get("rules", [])
@@ -109,10 +130,10 @@ def evaluate_substitution(original, substitute, product_sku, company_name):
     ]
     combined_inference = blocker_result["inference"]
     if rag_inference:
-        combined_inference += "\n\n[KB-grounded analysis]\n" + rag_inference
+        combined_inference += "\n\n[Research-grounded analysis]\n" + rag_inference
 
     caveats = rag_caveats if rag_caveats else [
-        "RAG evaluation unavailable. Deterministic blocker engine only."
+        "Research agent and RAG evaluation unavailable. Deterministic blocker engine only."
     ]
 
     sub_name = substitute.get("current_match_name") or substitute["ingredient_name"]
