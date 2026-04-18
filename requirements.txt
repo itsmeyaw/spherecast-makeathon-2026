@@ -3,3 +3,5 @@ boto3
 httpx
 beautifulsoup4
 lxml
+psycopg2-binary
+markitdown
