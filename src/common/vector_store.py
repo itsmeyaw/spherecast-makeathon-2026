@@ -39,6 +39,7 @@ def retrieve(query, n_results=5, keyword_weight=0.4):
         keyword_results = cur.fetchall()
 
     finally:
+        cur.close()
         conn.close()
 
     vector_ranks = {row[0]: rank for rank, row in enumerate(vector_results)}

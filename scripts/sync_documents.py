@@ -95,8 +95,20 @@ def ingest_document(bucket, s3_obj, conn):
         print(f"  Extracting sections with Claude...")
         sections = extract_sections(raw_text)
 
-        if not isinstance(sections, list):
+        if not isinstance(sections, list) or not sections:
             sections = [{"section_title": "Full Document", "content": raw_text}]
+        else:
+            validated = []
+            for i, sec in enumerate(sections):
+                if not isinstance(sec, dict):
+                    continue
+                if "content" not in sec or not sec["content"].strip():
+                    continue
+                validated.append({
+                    "section_title": sec.get("section_title", f"Section {i + 1}"),
+                    "content": sec["content"].strip(),
+                })
+            sections = validated if validated else [{"section_title": "Full Document", "content": raw_text}]
 
         print(f"  Chunking {len(sections)} sections...")
         chunks = chunk_sections(sections)
@@ -106,37 +118,42 @@ def ingest_document(bucket, s3_obj, conn):
         embeddings = embed_texts(texts)
 
         cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM documents WHERE s3_key = %s", (key,))
 
-        cur.execute("DELETE FROM documents WHERE s3_key = %s", (key,))
-
-        cur.execute(
-            """
-            INSERT INTO documents (s3_key, s3_etag, filename, doc_type)
-            VALUES (%s, %s, %s, %s) RETURNING id
-            """,
-            (key, etag, filename, doc_type),
-        )
-        doc_id = cur.fetchone()[0]
-
-        for chunk, embedding in zip(chunks, embeddings):
-            embedding_literal = "[" + ",".join(str(x) for x in embedding) + "]"
             cur.execute(
                 """
-                INSERT INTO document_chunks (document_id, section_title, content, chunk_index, embedding, metadata)
-                VALUES (%s, %s, %s, %s, %s::vector, %s::jsonb)
+                INSERT INTO documents (s3_key, s3_etag, filename, doc_type)
+                VALUES (%s, %s, %s, %s) RETURNING id
                 """,
-                (
-                    doc_id,
-                    chunk["section_title"],
-                    chunk["content"],
-                    chunk["chunk_index"],
-                    embedding_literal,
-                    json.dumps({}),
-                ),
+                (key, etag, filename, doc_type),
             )
+            doc_id = cur.fetchone()[0]
 
-        conn.commit()
-        print(f"  Ingested {len(chunks)} chunks for {filename}")
+            for chunk, embedding in zip(chunks, embeddings):
+                embedding_literal = "[" + ",".join(str(x) for x in embedding) + "]"
+                cur.execute(
+                    """
+                    INSERT INTO document_chunks (document_id, section_title, content, chunk_index, embedding, metadata)
+                    VALUES (%s, %s, %s, %s, %s::vector, %s::jsonb)
+                    """,
+                    (
+                        doc_id,
+                        chunk["section_title"],
+                        chunk["content"],
+                        chunk["chunk_index"],
+                        embedding_literal,
+                        json.dumps({}),
+                    ),
+                )
+
+            conn.commit()
+            print(f"  Ingested {len(chunks)} chunks for {filename}")
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
 
     finally:
         os.unlink(tmp_path)

@@ -1,21 +1,14 @@
-# src/common/chunker.py
+import re
+
 
 def _estimate_tokens(text):
     return len(text.split())
 
 
 def _split_into_sentences(text):
-    sentences = []
-    current = []
-    for char in text:
-        current.append(char)
-        if char in ".!?" and len(current) > 1:
-            sentences.append("".join(current).strip())
-            current = []
-    remainder = "".join(current).strip()
-    if remainder:
-        sentences.append(remainder)
-    return sentences
+    pattern = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s'
+    sentences = re.split(pattern, text)
+    return [s.strip() for s in sentences if s.strip()]
 
 
 def chunk_sections(sections, max_tokens=500, overlap_tokens=100):
