@@ -41,18 +41,29 @@ Key observations:
 | Bedrock Knowledge Base | RAG over scraped product pages + FDA regulations |
 | S3 | Document storage for Knowledge Base source files |
 
-### Local Stack
+### Local Stack (Dockerized)
 
 | Component | Purpose |
 |-----------|---------|
-| SQLite | Existing schema + Ingredient_Group table |
-| Streamlit | Frontend |
+| Docker Compose | Single `docker compose up` to run everything |
+| SQLite | Existing schema + Ingredient_Group table (mounted as volume) |
+| Streamlit | Frontend (exposed on port 8501) |
 | Python | Pipeline stages |
+
+Docker setup:
+- Single `Dockerfile` — Python image with all dependencies
+- `docker-compose.yml` — runs the Streamlit app, mounts `db.sqlite` as a volume so data persists
+- AWS credentials passed via environment variables (`.env` file, git-ignored)
+- No separate database container needed (SQLite is file-based)
 
 ### Project Structure
 
 ```
 makeathon2026/
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── .dockerignore
 ├── streamlit_app.py
 ├── db.sqlite
 ├── requirements.txt
