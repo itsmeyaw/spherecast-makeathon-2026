@@ -9,6 +9,7 @@ from src.common.db import (
     get_latest_research_job,
     get_research_jobs_for_product,
     get_suppliers_for_product,
+    get_supplier_specs,
     parse_ingredient_name,
 )
 from src.research.run import run_research
@@ -185,5 +186,25 @@ for component in components:
                     )
 
         st.caption(f"Completed: {job.get('UpdatedAt', '-')}")
+
+    if job_status == "completed":
+        specs = get_supplier_specs(product_id=component["product_id"])
+        if specs:
+            with st.expander("Supplier Specs Comparison", expanded=False):
+                pivot = {}
+                all_suppliers = set()
+                for s in specs:
+                    all_suppliers.add(s["SupplierName"])
+                    pivot.setdefault(s["SpecKey"], {})[s["SupplierName"]] = (
+                        f"{s['SpecValue']}" + (f" {s['SpecUnit']}" if s.get("SpecUnit") else "")
+                    )
+                suppliers_sorted = sorted(all_suppliers)
+                table_data = []
+                for spec_key in sorted(pivot.keys()):
+                    row_data = {"Specification": spec_key}
+                    for supplier in suppliers_sorted:
+                        row_data[supplier] = pivot[spec_key].get(supplier, "—")
+                    table_data.append(row_data)
+                st.dataframe(table_data, use_container_width=True, hide_index=True)
 
     st.divider()
