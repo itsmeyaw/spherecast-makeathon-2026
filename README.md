@@ -80,6 +80,9 @@ We also face the following problems:
 
 ## Vision: The Product Roadmap
 
+## 🔁 Vision Flow Diagram
+
+```mermaid
 flowchart TD
 
 A[Supplier Data & Market Inputs] --> B[Automated Document Acquisition]
@@ -118,19 +121,19 @@ P --> H
 %% COLOR DEFINITIONS
 %% =====================
 
-%% 🟢 CURRENT (already implemented)
+%% 🟢 CURRENT
 style A fill:#d1fae5,stroke:#065f46,stroke-width:2px
 style F fill:#d1fae5,stroke:#065f46,stroke-width:2px
 style E fill:#d1fae5,stroke:#065f46,stroke-width:2px
 style M fill:#d1fae5,stroke:#065f46,stroke-width:2px
 style L fill:#d1fae5,stroke:#065f46,stroke-width:2px
 
-%% 🟠 HYBRID (partially implemented)
+%% 🟠 HYBRID
 style G fill:#fed7aa,stroke:#9a3412,stroke-width:2px
 style H fill:#fed7aa,stroke:#9a3412,stroke-width:2px
 style K fill:#fed7aa,stroke:#9a3412,stroke-width:2px
 
-%% 🔵 FUTURE (vision)
+%% 🔵 FUTURE
 style B fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style C fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style D fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
@@ -139,11 +142,12 @@ style J fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style N fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style O fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style P fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+```
 
 **Legend**
-- 🟢 Green = Already implemented
-- 🟠 Orange = Partially implemented / evolving
-- 🔵 Blue = Vision / future components
+- 🟢 Green = Already implemented  
+- 🟠 Orange = Partially implemented / evolving  
+- 🔵 Blue = Vision / future components  
 
 1. ⁠**Automated Document Acquisition Agent:** Automates the manual procurement loop. If a supplier is in the "Flagged Tier," an outreach agent drafts a context-aware email requesting the missing TDS or CoA, parses the supplier's reply, processes the extracted information, and automatically updates the supplier's score.
 2. **Component Vector Database:** Embeds the ingredient items themselves into a vector database based on multi-dimensional key properties (not just raw text). By semantically clustering similar raw materials, future supplier queries and compatibility checks become significantly faster and cheaper to execute.
