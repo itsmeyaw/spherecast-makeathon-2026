@@ -80,6 +80,71 @@ We also face the following problems:
 
 ## Vision: The Product Roadmap
 
+flowchart TD
+
+A[Supplier Data & Market Inputs] --> B[Automated Document Acquisition]
+B --> C[Specification Data Pipeline]
+
+C --> D[Component Vector Database]
+C --> E[Knowledge Graph Evidence Engine]
+
+D --> F[Functional Role Modeling]
+E --> F
+
+F --> G[Spec-Constrained Substitution Engine]
+
+G --> H[Constraint Validation Layer]
+H --> I[Deterministic Optimization Solver]
+
+I --> J[Reformulation-Aware Cost Analysis]
+J --> K[Strategic Sourcing Decision]
+
+K --> L[Adversarial Quality Gate]
+L --> M[Final Recommendation]
+
+M --> N[Learning Loop]
+N --> O[Learned Weights & Priors]
+
+O --> G
+O --> I
+
+subgraph Regulatory Layer
+P[Multi-Market Regulatory Substrate]
+end
+
+P --> H
+
+%% =====================
+%% COLOR DEFINITIONS
+%% =====================
+
+%% 🟢 CURRENT (already implemented)
+style A fill:#d1fae5,stroke:#065f46,stroke-width:2px
+style F fill:#d1fae5,stroke:#065f46,stroke-width:2px
+style E fill:#d1fae5,stroke:#065f46,stroke-width:2px
+style M fill:#d1fae5,stroke:#065f46,stroke-width:2px
+style L fill:#d1fae5,stroke:#065f46,stroke-width:2px
+
+%% 🟠 HYBRID (partially implemented)
+style G fill:#fed7aa,stroke:#9a3412,stroke-width:2px
+style H fill:#fed7aa,stroke:#9a3412,stroke-width:2px
+style K fill:#fed7aa,stroke:#9a3412,stroke-width:2px
+
+%% 🔵 FUTURE (vision)
+style B fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style C fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style D fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style I fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style J fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style N fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style O fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+style P fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
+
+**Legend**
+- 🟢 Green = Already implemented
+- 🟠 Orange = Partially implemented / evolving
+- 🔵 Blue = Vision / future components
+
 1. ⁠**Automated Document Acquisition Agent:** Automates the manual procurement loop. If a supplier is in the "Flagged Tier," an outreach agent drafts a context-aware email requesting the missing TDS or CoA, parses the supplier's reply, processes the extracted information, and automatically updates the supplier's score.
 2. **Component Vector Database:** Embeds the ingredient items themselves into a vector database based on multi-dimensional key properties (not just raw text). By semantically clustering similar raw materials, future supplier queries and compatibility checks become significantly faster and cheaper to execute.
 3. ⁠**Deterministic Linear Problem Solver:** Procurement isn't just about finding a match; it's an optimization problem. Agnes will construct the abstract parameters (MOQ, capacity, lead time, price) and feed them into a linear programming solver to find the mathematically optimal substitution. This provides stronger, deterministic confidence for enterprise clients.
