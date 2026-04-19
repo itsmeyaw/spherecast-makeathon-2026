@@ -92,4 +92,4 @@ We also face the following problems:
 ---
 *Sources & Acknowledgements:* Database and framing by Spherecast. Canonical chemistry via PubChem (NIH). Regulatory thresholds cross-verified against EUR-Lex, EDQM, FDA, and public supplier TDSs. Risk priors informed by FDA Import Alerts and EU RASFF.
 
-*Team:* Yudhistira Arief Wiowo
+*Team:* Yudhis, Sebastian, Janet, Heona, Si-Hoon
