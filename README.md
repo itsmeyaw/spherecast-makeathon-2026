@@ -149,15 +149,36 @@ style P fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 - 🟠 Orange = Partially implemented / evolving  
 - 🔵 Blue = Vision / future components  
 
-1. ⁠**Automated Document Acquisition Agent:** Automates the manual procurement loop. If a supplier is in the "Flagged Tier," an outreach agent drafts a context-aware email requesting the missing TDS or CoA, parses the supplier's reply, processes the extracted information, and automatically updates the supplier's score.
-2. **Component Vector Database:** Embeds the ingredient items themselves into a vector database based on multi-dimensional key properties (not just raw text). By semantically clustering similar raw materials, future supplier queries and compatibility checks become significantly faster and cheaper to execute.
-3. ⁠**Deterministic Linear Problem Solver:** Procurement isn't just about finding a match; it's an optimization problem. Agnes will construct the abstract parameters (MOQ, capacity, lead time, price) and feed them into a linear programming solver to find the mathematically optimal substitution. This provides stronger, deterministic confidence for enterprise clients.
-4. ⁠**Full Knowledge-Graph Evidence Engine:** Expands inference into a multi-hop graph (Suppliers ↔️ Raw Materials ↔️ Finished Goods ↔️ Certifications) to enable counterfactual reasoning, determining exactly which missing document would reduce procurement risk the most.
-5. **Reformulation Aware Substitution:** Shifts the ranking metric from per-kg price to Total Cost of Substitution (Price Delta + Reformulation Overhead + Market Impact).
-6. ⁠**Learned Weights & Priors:** Transitions evidence weights and country risk scores from hand-specified logic to machine learning, trained on historical procurement audit successes and failures.
-7. ⁠**Multi-Market Regulatory Substrate:** Scales the architecture to cover every supplement ingredient, across every global market, pharmacopoeia, and claim regime.
-8. **Adversarial Quality Gate:** In addition to the research agent, it is worth it to create a subagent which points out fallacy in the proposal. This allows research agent to provide better argumentation to client. Usually, 1 quality check passthrough is enough.
 
+1. **Automated Document Acquisition Agent**  
+   Automates the manual procurement loop. If a supplier is in the "Flagged Tier," an outreach agent drafts a context-aware email requesting missing TDS or CoA documents, parses the supplier’s response, extracts structured data, and updates the supplier profile. This enables a continuous **specification data pipeline**.
+
+2. **Spec-Constrained Substitution Engine**  
+   Moves beyond functional equivalence to enforce **quantitative compatibility**. Substitutions are validated deterministically against constraints such as purity, assay %, particle size, and form, ensuring real-world interchangeability.
+
+3. **Component Vector Database**  
+   Embeds ingredients based on multi-dimensional properties (chemical identity, specs, functional role). This enables fast similarity search, clustering, and scalable compatibility checks.
+
+4. **Functional Role Modeling**  
+   Represents ingredients by **formulation role** (active, excipient, stabilizer, etc.), preventing invalid substitutions and enabling context-aware reasoning across product types.
+
+5. **Deterministic Linear Problem Solver**  
+   Treats procurement as an optimization problem. Agnes constructs parameters (MOQ, capacity, lead time, price) and uses a linear solver to compute the optimal supplier configuration, enabling true **supplier economics optimization**.
+
+6. **Full Knowledge-Graph Evidence Engine**  
+   Expands inference into a multi-hop graph (Suppliers ↔ Raw Materials ↔ Finished Goods ↔ Certifications). Enables counterfactual reasoning and identification of missing high-impact evidence, while also surfacing cross-company demand patterns.
+
+7. **Reformulation-Aware Substitution**  
+   Shifts ranking from per-unit price to **Total Cost of Substitution** (price delta + reformulation overhead + market impact), reflecting real manufacturing constraints.
+
+8. **Learned Weights & Priors**  
+   Transitions evidence weighting and country risk scoring from static logic to machine-learned models trained on historical procurement outcomes.
+
+9. **Multi-Market Regulatory Substrate**  
+   Scales the system across global regulatory frameworks (FDA, EU, pharmacopoeia standards), enabling compliant sourcing decisions in any market.
+
+10. **Adversarial Quality Gate**  
+    Introduces a verification sub-agent that challenges reasoning outputs, identifies weak logic, and strengthens decision robustness. Typically, a single adversarial pass is sufficient.
 ---
 *Sources & Acknowledgements:* Database and framing by Spherecast. Canonical chemistry via PubChem (NIH). Regulatory thresholds cross-verified against EUR-Lex, EDQM, FDA, and public supplier TDSs. Risk priors informed by FDA Import Alerts and EU RASFF.
 
