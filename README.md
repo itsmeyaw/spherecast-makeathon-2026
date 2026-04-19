@@ -6,7 +6,7 @@
 
 **Built on the Spherecast challenge database.**
 
-**Stack:** Python, LangGraph, SQLAlchemy, PubChem
+**Stack:** Python, LangGraph, Streamlit, SQLAlchemy, PubChem, OpenFDA
 
 **Scope:** US & EU dietary supplements (Demoed via Vitamin C).
 
