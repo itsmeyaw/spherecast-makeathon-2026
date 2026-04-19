@@ -1,98 +1,71 @@
-# Agnes Sourcing Workspace
+# Agnes: Sourcing Decision-Support for Supplement Raw Materials
 
 <p align="center">
   <img src="docs/img/product_research.gif" alt="UI" />
 </p>
 
+**Built on the Spherecast challenge database.**
+
+**Stack:** Python, LangGraph, SQLAlchemy, PubChem
+
+**Scope:** US & EU dietary supplements (Demoed via Vitamin C).
+
+## The Core Idea
+Most AI sourcing tools just pick the cheapest supplier and call it a day. Agnes does the opposite: it uses a three-layer reasoning system to produce **tiered candidate groups** and never makes up data it doesn't have.
+
+Every claim is traceable. Critical documents like TDSs, CoAs, and GMO statements are rarely public. Agnes treats that as a real problem to solve, not sweep under the rug.
+
+## Hero Scenario
+A brand needs to swap out a key raw material (say, Vitamin C for an effervescent powder) because their current supplier is out of stock. A simple price comparison won't cut it here. Agnes finds a substitute that is:
+1. ⁠**Legally compliant** (e.g., US 21 CFR 111 + EU 2002/46/EC).
+2. ⁠**Physically compatible** with the manufacturing process.
+3. **Backed by verifiable evidence**.
+4. **Strategically viable** (e.g., consolidating volume with an existing portfolio supplier).
+
+---
+
+## Architecture: Three Reasoning Layers
+
 <p align="center">
   <img src="docs/img/graph.png" alt="Graph" />
 </p>
 
-Agnes is now a lightweight sourcing decision workspace demo built on top of the provided SQLite portfolio graph.
 
-What is real in this repo:
-- the internal graph: `company -> product -> BOM -> BOM component -> supplier product`
-- exact-match consolidation opportunities
-- curated alias-match opportunities
-- persisted opportunity, evidence, requirement, and review state in SQLite
-- deterministic blocker states for a narrow demo slice
-- a Streamlit workspace with Overview, Queue, Detail, and Review pages
+### Layer 1: Identity and Compliance (Deterministic Gate)
+An automated legal and chemical gate, nothing gets through without passing these checks.
+- ⁠**Canonical Vocabulary:** Anchors ingredients to global registries (e.g., PubChem CID, CAS).
+- ⁠**Legal Whitelists:** Rejects non-permitted chemical forms based on target market regulations.
+- ⁠**Purity Thresholds:** Enforces pharmacopoeia standards (USP / Ph. Eur.) for assay percentages, heavy metals, and elemental impurities (per ICH Q3D).
 
-What is intentionally not claimed:
-- autonomous substitute approval
-- full compliance validation
-- pricing or savings optimization
-- live scraping as a demo-critical dependency
+### Layer 2: Evidence-Weighted Enrichment (The Epistemic Core)
+Ranks candidates by how trustworthy their data actually is (e.g., Authoritative Registry = 0.95, Supplier Website = 0.70, LLM Inference = 0.20).
+- **Contrapositive Inference:** Supplier documents are usually private, so Agnes infers raw material properties from Finished Goods (FG). If a tightly regulated CPG brand claims "Non-GMO" on their label, Agnes infers their mapped supplier provides a Non-GMO grade. Missing evidence counts as zero — it's never silently ignored.
 
-## Demo posture
+### Layer 3: Strategic Reasoning (Business Logic)
+Decides what to do with the verified data.
+- **Country-Tier Scoring:** Uses calibrated priors from FDA/EU import alerts and export history to assess geographic risk, overridable by strong supplier-specific signals.
+- **Consolidation Bonus:** Boosts scores for suppliers already used by other portfolio brands to improve MOQ and pricing leverage.
+- **Substitution-Delta Risk:** Measures the real impact of a swap (e.g., switching from a crystalline to a coated form means costly reformulation; changing countries shifts tariff exposure).
 
-The app is opinionated about uncertainty:
-- exact-match opportunities can pass known blockers
-- curated aliases only pass when the local demo evidence pack marks them as high-strength identity matches
-- broader alias and hypothesis candidates are routed to `needs-review`
-- if supporting data is missing, the app records the gap instead of inventing certainty
+---
 
-## Workspace schema additions
+## Output: Tiered Candidate Groups
+Agnes groups results into tiers that match how procurement teams actually work. Every candidate carries a full reasoning trace and re-ranks automatically when variables change.
+- **Preferred Tier:** Clears all purity gates, has authoritative evidence, low country risk, and offers strategic consolidation.
+- **Acceptable Tier:** Passes legal gates but comes with minor strategic trade-offs (e.g., higher baseline country risk, offset by a strong individual track record).
+- **Flagged Tier:** Promising but missing critical private evidence. Queues the acquisition agent.
 
-The repo now extends `db.sqlite` with:
-- `Ingredient_Alias`
-- `Opportunity`
-- `Opportunity_Candidate`
-- `Evidence`
-- `Requirement_Profile`
-- `Review_Decision`
+---
 
-These tables are created by `scripts/init_db.py`.
+## Vision: The Product Roadmap
 
-## Local demo evidence pack
+1. ⁠**Automated Document Acquisition Agent:** Automates the manual procurement loop. If a supplier is in the "Flagged Tier," an outreach agent drafts a context-aware email requesting the missing TDS or CoA, parses the supplier's reply, processes the extracted information, and automatically updates the supplier's score.
+2. **Component Vector Database:** Embeds the ingredient items themselves into a vector database based on multi-dimensional key properties (not just raw text). By semantically clustering similar raw materials, future supplier queries and compatibility checks become significantly faster and cheaper to execute.
+3. ⁠**Deterministic Linear Problem Solver:** Procurement isn't just about finding a match; it's an optimization problem. Agnes will construct the abstract parameters (MOQ, capacity, lead time, price) and feed them into a linear programming solver to find the mathematically optimal substitution. This provides stronger, deterministic confidence for enterprise clients.
+4. ⁠**Full Knowledge-Graph Evidence Engine:** Expands inference into a multi-hop graph (Suppliers ↔️ Raw Materials ↔️ Finished Goods ↔️ Certifications) to enable counterfactual reasoning, determining exactly which missing document would reduce procurement risk the most.
+5. **Reformulation Aware Substitution:** Shifts the ranking metric from per-kg price to Total Cost of Substitution (Price Delta + Reformulation Overhead + Market Impact).
+6. ⁠**Learned Weights & Priors:** Transitions evidence weights and country risk scores from hand-specified logic to machine learning, trained on historical procurement audit successes and failures.
+7. ⁠**Multi-Market Regulatory Substrate:** Scales the architecture to cover every supplement ingredient, across every global market, pharmacopoeia, and claim regime.
 
-Phase 1 uses a reproducible local fact cache in [src/scraper/cache.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/scraper/cache.py:1) instead of relying on live web retrieval.
-
-That cache supplies:
-- reviewed ingredient identity facts for a narrow ingredient slice
-- limited product-level facts for demo blocker scenarios
-- evidence-strength labels used by the blocker engine
-
-## Run the app
-
-1. Initialize the workspace tables and seed aliases:
-
-```bash
-python3 scripts/init_db.py
-```
-
-2. Launch Streamlit:
-
-```bash
-streamlit run streamlit_app.py
-```
-
-3. Open `http://localhost:8501`
-
-The app will build the opportunity workspace from the current `db.sqlite` on first load. You can force a rebuild from the home page.
-
-## Run tests
-
-```bash
-pytest -q
-```
-
-## Main modules
-
-- [src/common/db.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/common/db.py:1): schema helpers, portfolio queries, alias seeding
-- [src/substitute/find_candidates.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/substitute/find_candidates.py:1): exact and alias candidate discovery
-- [src/opportunity/build.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/opportunity/build.py:1): opportunity generation pipeline
-- [src/opportunity/store.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/opportunity/store.py:1): persistence, queue queries, review state
-- [src/reasoning/blockers.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/reasoning/blockers.py:1): deterministic blocker engine
-- [src/reasoning/explain.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/src/reasoning/explain.py:1): explanation synthesis from structured facts
-- [pages/1_Overview.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/pages/1_Overview.py:1), [pages/2_Opportunity_Queue.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/pages/2_Opportunity_Queue.py:1), [pages/3_Opportunity_Detail.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/pages/3_Opportunity_Detail.py:1), [pages/4_Review.py](/Users/janetbrinz/Documents/Codex/2026-04-18-git-clone-https-github-com-itsmeyaw/pages/4_Review.py:1): sourcing workspace UI
-
-## Deferred on purpose
-
-- live supplier scraping
-- OCR and multimodal extraction
-- pricing, savings, and lead-time logic
-- universal compliance engine
-- broader CPG generalization beyond the narrow supplement demo slice
-
-
+---
+*Sources & Acknowledgements:* Database and framing by Spherecast. Canonical chemistry via PubChem (NIH). Regulatory thresholds cross-verified against EUR-Lex, EDQM, FDA, and public supplier TDSs. Risk priors informed by FDA Import Alerts and EU RASFF.
