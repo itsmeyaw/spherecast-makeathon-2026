@@ -13,12 +13,12 @@
 [Core Idea](#the-core-idea) · [Hero Scenario](#hero-scenario) · [Architecture](#architecture-three-reasoning-layers) · [Output](#output-tiered-candidate-groups) · [Key Learning](#key-learning) · [Vision](#vision-the-product-roadmap)
 
 ## The Core Idea
-Most AI sourcing tools just pick the cheapest supplier and call it a day. Agnes does the opposite: it uses a three-layer reasoning system to produce **tiered candidate groups** and never makes up data it doesn't have.
+Most AI sourcing tools just pick the cheapest supplier and do not go further. Agnes does the opposite: it uses a three-layer reasoning system to produce **tiered candidate groups** and never makes up data it doesn't have.
 
-Every claim is traceable. Critical documents like TDSs, CoAs, and GMO statements are rarely public. Agnes treats that as a real problem to solve, not sweep under the rug.
+Every claim is traceable. Critical documents like TDSs, CoAs, and GMO statements are rarely public. Agnes treats that as a real problem to solve, rather than ignoring it.
 
 ## Hero Scenario
-A brand needs to swap out a key raw material (say, Vitamin C for an effervescent powder) because their current supplier is out of stock. A simple price comparison won't cut it here. Agnes finds a substitute that is:
+A brand needs to swap out a key raw material (say, Vitamin C for an effervescent powder) because their current supplier is out of stock. A simple price comparison is not enough here. Agnes finds a substitute that is:
 1. ⁠**Legally compliant** (e.g., US 21 CFR 111 + EU 2002/46/EC).
 2. ⁠**Physically compatible** with the manufacturing process.
 3. **Backed by verifiable evidence**.
