@@ -10,6 +10,8 @@
 
 **Scope:** US & EU dietary supplements (Demoed via Vitamin C).
 
+[Core Idea](#the-core-idea) · [Hero Scenario](#hero-scenario) · [Architecture](#architecture-three-reasoning-layers) · [Output](#output-tiered-candidate-groups) · [Key Learning](#key-learning) · [Vision](#vision-the-product-roadmap)
+
 ## The Core Idea
 Most AI sourcing tools just pick the cheapest supplier and call it a day. Agnes does the opposite: it uses a three-layer reasoning system to produce **tiered candidate groups** and never makes up data it doesn't have.
 
@@ -51,9 +53,10 @@ Decides what to do with the verified data.
 
 ## Output: Tiered Candidate Groups
 Agnes groups results into tiers that match how procurement teams actually work. Every candidate carries a full reasoning trace and re-ranks automatically when variables change.
-- **Preferred Tier:** Clears all purity gates, has authoritative evidence, low country risk, and offers strategic consolidation.
-- **Acceptable Tier:** Passes legal gates but comes with minor strategic trade-offs (e.g., higher baseline country risk, offset by a strong individual track record).
-- **Flagged Tier:** Promising but missing critical private evidence. Queues the acquisition agent.
+- **Preferred:** Clears all purity gates, has authoritative evidence, low country risk, and offers strategic consolidation.
+- **Acceptable:** Passes legal gates but comes with minor strategic trade-offs (e.g., higher baseline country risk, offset by a strong individual track record).
+- **Flagged:** Promising but missing critical private evidence. Queues the acquisition agent.
+- **Unknown:** Could not provide a good decision based on the current evidences due to limited knowledge and information.
 
 ---
 
@@ -88,3 +91,5 @@ We also face the following problems:
 
 ---
 *Sources & Acknowledgements:* Database and framing by Spherecast. Canonical chemistry via PubChem (NIH). Regulatory thresholds cross-verified against EUR-Lex, EDQM, FDA, and public supplier TDSs. Risk priors informed by FDA Import Alerts and EU RASFF.
+
+*Team:* Yudhistira Arief Wiowo
