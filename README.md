@@ -80,7 +80,12 @@ We also face the following problems:
 
 ## Vision: The Product Roadmap
 
-## 🔁 Vision Flow Diagram
+**Legend**
+- 🟢 Green = Already implemented  
+- 🟠 Orange = Partially implemented / evolving  
+- 🔵 Blue = Vision / future components  
+
+## Vision Flow Diagram
 
 ```mermaid
 flowchart TD
@@ -144,10 +149,7 @@ style O fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 style P fill:#dbeafe,stroke:#1e3a8a,stroke-width:2px
 ```
 
-**Legend**
-- 🟢 Green = Already implemented  
-- 🟠 Orange = Partially implemented / evolving  
-- 🔵 Blue = Vision / future components  
+
 
 
 1. **Automated Document Acquisition Agent**  
