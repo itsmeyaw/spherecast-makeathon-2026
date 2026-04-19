@@ -31,7 +31,7 @@ A brand needs to swap out a key raw material (say, Vitamin C for an effervescent
 </p>
 
 
-### Layer 1: Identity and Compliance (Deterministic Gate)
+### Layer 1: Identity and Compliance (Deterministic Gate) using Domain Expert Annotation
 An automated legal and chemical gate, nothing gets through without passing these checks.
 - ⁠**Canonical Vocabulary:** Anchors ingredients to global registries (e.g., PubChem CID, CAS).
 - ⁠**Legal Whitelists:** Rejects non-permitted chemical forms based on target market regulations.
@@ -39,7 +39,7 @@ An automated legal and chemical gate, nothing gets through without passing these
 
 ### Layer 2: Evidence-Weighted Enrichment (The Epistemic Core)
 Ranks candidates by how trustworthy their data actually is (e.g., Authoritative Registry = 0.95, Supplier Website = 0.70, LLM Inference = 0.20).
-- **Contrapositive Inference:** Supplier documents are usually private, so Agnes infers raw material properties from Finished Goods (FG). If a tightly regulated CPG brand claims "Non-GMO" on their label, Agnes infers their mapped supplier provides a Non-GMO grade. Missing evidence counts as zero — it's never silently ignored.
+- **Contrapositive Inference:** Supplier documents are usually private, so Agnes infers raw material properties from Finished Goods (FG). If a tightly regulated CPG brand claims "Non-GMO" on their label, Agnes infers their mapped supplier provides a Non-GMO grade. Missing evidence counts as zero. It's never silently ignored.
 
 ### Layer 3: Strategic Reasoning (Business Logic)
 Decides what to do with the verified data.
